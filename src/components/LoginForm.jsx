@@ -11,155 +11,135 @@ import {
 } from 'lucide-react';
 import { formatJruId, isJruIdValid, getJruIdValidationError } from '../utils/idValidation';
 
-export const LoginForm = ({ onSuccess, onForgotPassword, onSwitchToSignUp }) => {
+
+export const LoginForm = ({ onSuccess, onForgotPassword, onSwitchToSignUp,}) => {
   const [role, setRole] = useState('student');
+
   const [formData, setFormData] = useState({
     role: 'student',
     identifier: '',
     password: '',
     rememberMe: true,
   });
+
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const handleIdentifierChange = (val) => {
-    if (formData.identifier.endsWith('-') && val.length === formData.identifier.length - 1) {
-      setFormData((prev) => ({ ...prev, identifier: val }));
-      return;
-    }
-    if (!val.includes('@') && /^[0-9-]*$/.test(val)) {
-      setFormData((prev) => ({ ...prev, identifier: formatJruId(val) }));
-    } else {
-      setFormData((prev) => ({ ...prev, identifier: val }));
-    }
-  };
+  const handleRoleChange = (newRole) => {
+    setRole(newRole);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+    setFormData((prev) => ({
+      ...prev,
+      role: newRole,
+      identifier: '',
+    }));
+
     setError(null);
-    const cleanIdentifier = formData.identifier.trim();
-    if (!cleanIdentifier) {
-      setError(
-        role === 'teacher'
-          ? 'Please enter your Faculty ID or JRU Email.'
-          : 'Please enter your Student ID Number or JRU Email.'
-      );
-      return;
-    }
-
-    const isEmail = cleanIdentifier.includes('@');
-    if (!isEmail) {
-      const idError = getJruIdValidationError(cleanIdentifier, role);
-      if (idError) {
-        setError(idError);
-        return;
-      }
-    }
-
-    if (!formData.password) {
-      setError('Please enter your portal password.');
-      return;
-    }
-
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      const emailDomain = isEmail
-        ? cleanIdentifier
-        : role === 'teacher'
-        ? `${cleanIdentifier.replace(/[^a-zA-Z0-9]/g, '')}@jru.edu`
-        : `${cleanIdentifier.replace(/[^a-zA-Z0-9]/g, '')}@my.jru.edu`;
-
-      if (role === 'teacher') {
-        onSuccess({
-          role: 'teacher',
-          name: isEmail
-            ? cleanIdentifier
-                .split('@')[0]
-                .split('.')
-                .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
-                .join(' ')
-            : 'Prof. Arnold Dela Cruz',
-          studentNumber: isEmail ? 'FAC-8092' : cleanIdentifier,
-          email: emailDomain.toLowerCase(),
-          category: 'Information Technology',
-          department: 'College of Computer Studies',
-          yearLevel: 'Associate Professor / Faculty Lead',
-          status: 'Faculty',
-          contributedReviewersCount: 8,
-          upvotesReceived: 215,
-          savedReviewersCount: 12,
-        });
-      } else {
-        onSuccess({
-          role: 'student',
-          name: isEmail
-            ? cleanIdentifier
-                .split('@')[0]
-                .split('.')
-                .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
-                .join(' ')
-            : 'Aines Julia Degesica',
-          studentNumber: isEmail ? '25-260000' : cleanIdentifier,
-          email: emailDomain.toLowerCase(),
-          category: 'Information Technology',
-          department: 'College of Computer Studies',
-          yearLevel: '3rd Year (Junior)',
-          status: 'Enrolled',
-          contributedReviewersCount: 3,
-          upvotesReceived: 88,
-          savedReviewersCount: 6,
-        });
-      }
-    }, 600);
   };
+
+  const handleIdentifierChange = (val) => {
+  // Allow email addresses without formatting or length restrictions.
+  if (val.includes('@')) {
+    setFormData((prev) => ({
+      ...prev,
+      identifier: val,
+    }));
+    return;
+  }
+
+  // Format student IDs only.
+  if (/^[0-9-]*$/.test(val)) {
+    setFormData((prev) => ({
+      ...prev,
+      identifier: formatJruId(val),
+    }));
+  } else {
+    setFormData((prev) => ({
+      ...prev,
+      identifier: val,
+    }));
+  }
+  };
+
+  const handleSubmit = async (e) => {
+  e.preventDefault();
+  setError(null);
+
+  const cleanIdentifier = formData.identifier.trim();
+
+  if (!cleanIdentifier) {
+    setError(
+      role === 'teacher'
+        ? 'Please enter your Faculty ID or JRU Email.'
+        : 'Please enter your Student ID Number or JRU Email.'
+    );
+    return;
+  }
+
+  if (!cleanIdentifier.includes('@')) {
+    const idError = getJruIdValidationError(cleanIdentifier, role);
+
+    if (idError) {
+      setError(idError);
+      return;
+    }
+  }
+
+  if (!formData.password) {
+    setError('Please enter your portal password.');
+    return;
+  }
+
+  setIsLoading(true);
+
+  try {
+    const response = await fetch('http://127.0.0.1:8000/api/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        identifier: cleanIdentifier,
+        password: formData.password,
+        role,
+        remember: formData.rememberMe,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Invalid credentials. Please try again.');
+    }
+
+    if (!data.user) {
+      throw new Error('The server did not return a user profile.');
+    }
+
+    onSuccess(data.user);
+  } catch (err) {
+    setError(
+      err.message || 'Unable to connect to the server. Please try again.'
+    );
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleInstitutionalEmailSSO = () => {
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      if (role === 'teacher') {
-        onSuccess({
-          role: 'teacher',
-          name: 'Prof. Arnold Dela Cruz',
-          studentNumber: 'FAC-8092',
-          email: 'arnold.delacruz@jru.edu',
-          category: 'Information Technology',
-          department: 'College of Computer Studies',
-          yearLevel: 'Associate Professor',
-          status: 'Faculty',
-          contributedReviewersCount: 8,
-          upvotesReceived: 215,
-          savedReviewersCount: 12,
-        });
-      } else {
-        onSuccess({
-          role: 'student',
-          name: 'Aines Julia Degesica',
-          studentNumber: '25-260000',
-          email: 'ainesjulia.degesica@my.jru.edu',
-          category: 'Information Technology',
-          department: 'College of Computer Studies',
-          yearLevel: '3rd Year (Junior)',
-          status: 'Enrolled',
-          contributedReviewersCount: 3,
-          upvotesReceived: 88,
-          savedReviewersCount: 6,
-        });
-      }
-    }, 500);
-  };
+  setError(
+    'Institutional single sign-on is not configured yet. Please use your account credentials.'
+  );
+};
 
   return (
     <form id="jru-login-form" onSubmit={handleSubmit} className="space-y-3.5 sm:space-y-4">
       <div className="p-1 bg-slate-100 rounded-xl flex items-center border border-slate-200">
         <button
           type="button"
-          onClick={() => {
-            setRole('student');
-            setFormData({ ...formData, role: 'student' });
-          }}
+          onClick={() => handleRoleChange('student')}
           className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
             role === 'student'
               ? 'bg-[#002147] text-amber-300 shadow-sm'
@@ -171,10 +151,7 @@ export const LoginForm = ({ onSuccess, onForgotPassword, onSwitchToSignUp }) => 
         </button>
         <button
           type="button"
-          onClick={() => {
-            setRole('teacher');
-            setFormData({ ...formData, role: 'teacher' });
-          }}
+          onClick={() => handleRoleChange('teacher')}
           className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
             role === 'teacher'
               ? 'bg-[#002147] text-amber-300 shadow-sm'

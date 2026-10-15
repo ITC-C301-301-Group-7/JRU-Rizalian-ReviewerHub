@@ -35,16 +35,19 @@ export function StudentDashboardPreview({ student, onSignOut, onNavigate }) {
     }
   };
 
-  // Default fallback user data
+  
+  // Get profile information from the signed-in user.
   const userData = {
-    name: student?.name || 'Aines Julia Degesica',
-    studentId: student?.studentId || 'JRU-2024-01919',
-    program: student?.program || 'Bachelor of Science in Business Administration',
-    college: student?.college || 'College of Business Administration',
-    yearLevel: student?.yearLevel || '3rd Year (Junior)',
-    gpa: student?.gpa || '1.25',
-    email: student?.email || 'student@jru.edu'
+    name: student?.name || 'Name not provided',
+    studentId: student?.studentNumber || student?.studentId || 'Not provided',
+    program: student?.program || student?.category || 'Not provided',
+    college: student?.college || student?.department || 'Not provided',
+    yearLevel: student?.yearLevel || 'Not provided',
+    email: student?.email || 'Not provided',
+    role: student?.role || 'student',
+    status: student?.status || 'Registered',
   };
+
 
   const courses = [
     { code: 'MGT 301', name: 'Strategic Management', instructor: 'Prof. A. Santos', schedule: 'Mon/Wed 10:00 AM - 11:30 AM', room: 'Building A - Room 302', grade: '1.25' },
@@ -155,7 +158,7 @@ export function StudentDashboardPreview({ student, onSignOut, onNavigate }) {
               <div className="flex items-center gap-2">
                 <h1 className="text-xl sm:text-2xl font-black tracking-wide">{userData.name}</h1>
                 <span className="bg-amber-400 text-[#002147] text-[10px] font-black uppercase px-2 py-0.5 rounded-full">
-                  Active Student
+                  {userData.role === 'teacher' ? 'Faculty Account' : 'Student Account'}
                 </span>
               </div>
               <p className="text-xs text-slate-300 mt-0.5 flex items-center gap-2">
