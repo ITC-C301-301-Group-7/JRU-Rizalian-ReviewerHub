@@ -1,722 +1,168 @@
-import React, { useState, useMemo } from 'react';
-import { 
-  BookOpen, 
-  GraduationCap, 
-  LogOut, 
-  Trophy, 
-  Calendar, 
-  Clock, 
-  Download, 
-  Star, 
-  Search, 
-  CheckCircle, 
-  Building2,
-  Sparkles,
-  ShieldCheck,
-  Lock,
-  UserCheck,
-  Check,
-  X,
-  AlertTriangle,
-  FileText
+import React, { useMemo, useState } from 'react';
+import {
+  BookOpen, GraduationCap, LogOut, Trophy, Calendar, Clock, Download,
+  Star, Search, CheckCircle, Building2, Sparkles, ShieldCheck, Lock,
+  UserCheck, Check, X, AlertTriangle, Camera
 } from 'lucide-react';
 
-export function StudentDashboardPreview({ student, onSignOut, onNavigate }) {
-  const [activeTab, setActiveTab] = useState('overview');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [downloadingId, setDownloadingId] = useState(null);
+const initialCourses = [
+  { code: 'MGT 301', name: 'Strategic Management', instructor: 'Prof. A. Santos', schedule: 'Mon/Wed 10:00 AM - 11:30 AM', room: 'Building A - Room 302', grade: '1.25' },
+  { code: 'ACC 202', name: 'Financial Accounting & Reporting', instructor: 'Dr. M. Reyes', schedule: 'Tue/Thu 1:00 PM - 2:30 PM', room: 'Building B - Room 104', grade: '1.50' },
+  { code: 'GE 105', name: 'Purposive Communication', instructor: 'Prof. L. Garcia', schedule: 'Fri 8:00 AM - 11:00 AM', room: 'Online / LMS', grade: '1.00' },
+  { code: 'IT 101', name: 'Introduction to Computing', instructor: 'Engr. J. Cruz', schedule: 'Tue/Thu 9:00 AM - 10:30 AM', room: 'IT Lab 3', grade: '1.25' },
+];
 
-  // Fallback handler if onNavigate is not provided
-  const handleNavigateToReviewerHub = () => {
-    if (typeof onNavigate === 'function') {
-      onNavigate('ReviewerCommunityView');
-    } else {
-      setActiveTab('reviewers');
-    }
-  };
+const resources = [
+  { id: 1, title: 'Comprehensive Strategic Management Midterm Reviewer', course: 'MGT 301', author: 'J. Dela Cruz', rating: 4.9, downloads: 342 },
+  { id: 2, title: 'Financial Accounting Practice Problems & Solutions', course: 'ACC 202', author: 'L. Fabular', rating: 4.8, downloads: 512 },
+  { id: 3, title: 'Purposive Communication Finals Summary Guide', course: 'GE 105', author: 'P. Jebulan', rating: 4.7, downloads: 219 },
+];
 
+const policies = [
+  { title: 'Account Security & Identity Verification', icon: Lock, rules: ['Only verified JRU students and faculty may log in.', 'Account sharing and impersonation are prohibited.'] },
+  { title: 'Academic Integrity & Content Quality', icon: UserCheck, rules: ['Cite sources when needed.', 'Sharing unauthorized exam materials is prohibited.'] },
+  { title: 'Prohibition of Unlawful & Harmful Content', icon: AlertTriangle, rules: ['Malware and malicious scripts are forbidden.', 'Unauthorized copyrighted textbooks are prohibited.'] },
+  { title: 'Respectful Community Conduct', icon: CheckCircle, rules: ['Follow JRU civil conduct rules.', 'Harassment and hate speech may result in suspension.'] },
+  { title: 'Data Privacy & Infrastructure Compliance', icon: ShieldCheck, rules: ['Do not bypass security or scrape records.', 'System activity may be logged for audits.'] },
+];
+
+const Button = ({ children, onClick, className = '', ...props }) => (
+  <button type="button" onClick={onClick} className={`rounded-lg px-3 py-2 text-xs font-bold ${className}`} {...props}>{children}</button>
+);
+
+export function StudentDashboardPreview({ student, onSignOut, onNavigate, onUserUpdated }) {
+  const [tab, setTab] = useState('overview');
+  const [query, setQuery] = useState('');
+  const [courses, setCourses] = useState(initialCourses);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({ name: '', instructor: '', schedule: '', room: '' });
+  const [uploading, setUploading] = useState(false);
+  const [photoError, setPhotoError] = useState('');
+  const [photoSuccess, setPhotoSuccess] = useState('');
+
+  const name = student?.name || 'Name not provided';
+  const studentId = student?.studentNumber || student?.studentId || 'Not provided';
+  const college = student?.college || student?.department || 'Not provided';
+  const year = student?.yearLevel || 'Not provided';
+  const role = student?.role || 'student';
+  const photo = student?.profile_photo_url;
+  const filteredResources = useMemo(() => resources.filter(r =>
+    `${r.title} ${r.course} ${r.author}`.toLowerCase().includes(query.toLowerCase())
+  ), [query]);
+
+  const goToReviewers = () => typeof onNavigate === 'function' ? onNavigate('ReviewerCommunityView') : setTab('reviewers');
+
+  const changePhoto = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    setPhotoError(''); setPhotoSuccess('');
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) return setPhotoError('Choose a JPG, PNG, or WEBP image.');
+    if (file.size > 2 * 1024 * 1024) return setPhotoError('The image must be 2 MB or smaller.');
+    if (!student?.token) return setPhotoError('Please sign in again before changing your picture.');
   
-  // Get profile information from the signed-in user.
-  const userData = {
-    name: student?.name || 'Name not provided',
-    studentId: student?.studentNumber || student?.studentId || 'Not provided',
-    program: student?.program || student?.category || 'Not provided',
-    college: student?.college || student?.department || 'Not provided',
-    yearLevel: student?.yearLevel || 'Not provided',
-    email: student?.email || 'Not provided',
-    role: student?.role || 'student',
-    status: student?.status || 'Registered',
-  };
+  const body = new FormData();
+    body.append('profile_photo', file);
+    setUploading(true);
 
-
-  
-  const [courses, setCourses] = useState([
-    {
-      code: 'MGT 301',
-      name: 'Strategic Management',
-      instructor: 'Prof. A. Santos',
-      schedule: 'Mon/Wed 10:00 AM - 11:30 AM',
-      room: 'Building A - Room 302',
-      grade: '1.25',
-    },
-    {
-      code: 'ACC 202',
-      name: 'Financial Accounting & Reporting',
-      instructor: 'Dr. M. Reyes',
-      schedule: 'Tue/Thu 1:00 PM - 2:30 PM',
-      room: 'Building B - Room 104',
-      grade: '1.50',
-    },
-    {
-      code: 'GE 105',
-      name: 'Purposive Communication',
-      instructor: 'Prof. L. Garcia',
-      schedule: 'Fri 8:00 AM - 11:00 AM',
-      room: 'Online / LMS',
-      grade: '1.00',
-    },
-    {
-      code: 'IT 101',
-      name: 'Introduction to Computing',
-      instructor: 'Engr. J. Cruz',
-      schedule: 'Tue/Thu 9:00 AM - 10:30 AM',
-      room: 'IT Lab 3',
-      grade: '1.25',
-    },
-  ]);
-
-  const [editingCourse, setEditingCourse] = useState(null);
-
-  const [courseForm, setCourseForm] = useState({
-    name: '',
-    instructor: '',
-    schedule: '',
-    room: '',
+  try {
+  const response = await fetch('http://127.0.0.1:8000/api/profile/photo', {
+    method: 'POST',
+    headers: { Accept: 'application/json', Authorization: `Bearer ${student.token}`,},
+    body,
   });
 
-  const startEditingCourse = (course) => {
-    setEditingCourse(course.code);
-    setCourseForm({
-      name: course.name,
-      instructor: course.instructor,
-      schedule: course.schedule,
-      room: course.room,
-    });
-  };
+  const text = await response.text();
+  let data;
 
-  const saveCourseChanges = (event) => {
-    event.preventDefault();
-
-    setCourses((previousCourses) =>
-      previousCourses.map((course) =>
-        course.code === editingCourse
-          ? { ...course, ...courseForm }
-          : course
-      )
-    );
-
-    setEditingCourse(null);
-  };
-
-  const studyResources = [
-    { id: 1, title: 'Comprehensive Strategic Management Midterm Reviewer', course: 'MGT 301', author: 'J. Dela Cruz', rating: 4.9, downloads: 342, date: 'Oct 2024' },
-    { id: 2, title: 'Financial Accounting Practice Problems & Solutions', course: 'ACC 202', author: 'L. Fabular', rating: 4.8, downloads: 512, date: 'Nov 2024' },
-    { id: 3, title: 'Purposive Communication Finals Summary Guide', course: 'GE 105', author: 'P. Jebulan', rating: 4.7, downloads: 219, date: 'Dec 2024' }
-  ];
-
-  // 5 Core Policies Dataset
-  const portalPolicies = [
-    {
-      id: 1,
-      title: 'Account Security & Identity Verification',
-      icon: Lock,
-      rules: [
-        'Login access is restricted strictly to verified JRU students and faculty.',
-        'Credentials are non-transferable; account sharing or impersonation is prohibited.'
-      ]
-    },
-    {
-      id: 2,
-      title: 'Academic Integrity & Content Quality',
-      icon: UserCheck,
-      rules: [
-        'Uploaded study guides must be original work or cited appropriately.',
-        'Leaking live examination keys or unauthorized test materials is grounds for expulsion.'
-      ]
-    },
-    {
-      id: 3,
-      title: 'Prohibition of Unlawful & Harmful Content',
-      icon: AlertTriangle,
-      rules: [
-        'Distributing malware, spyware, or malicious scripts via files is forbidden.',
-        'Copyright-infringing commercial textbooks without authorization are prohibited.'
-      ]
-    },
-    {
-      id: 4,
-      title: 'Respectful Community Conduct',
-      icon: CheckCircle,
-      rules: [
-        'All forum interactions and feedback must adhere to JRU civil conduct rules.',
-        'Harassment, hate speech, or derogatory comments will result in account suspension.'
-      ]
-    },
-    {
-      id: 5,
-      title: 'Data Privacy & Infrastructure Compliance',
-      icon: ShieldCheck,
-      rules: [
-        'Bypassing system encryption or scraping institutional records is forbidden.',
-        'System usage is logged under JRU IT Infrastructure policies for audit compliance.'
-      ]
+  try {
+    data = JSON.parse(text);
+  } catch {
+    console.error(text);
+    throw new Error('Server error. Check Laravel logs.');
+  }
+  if (!response.ok) {
+    throw new Error(data.message || 'Upload failed.');
+  }
+  if (data.user) onUserUpdated?.(data.user);
+    setPhotoSuccess('Profile picture updated.');
+    setPhotoError('');
+    }  catch (error) {
+        setPhotoError(error.message);
+    } finally {
+        setUploading(false);
     }
-  ];
-
-  // Filter study resources dynamically
-  const filteredResources = useMemo(() => {
-    if (!searchQuery.trim()) return studyResources;
-    const query = searchQuery.toLowerCase();
-    return studyResources.filter(
-      (res) =>
-        res.title.toLowerCase().includes(query) ||
-        res.course.toLowerCase().includes(query) ||
-        res.author.toLowerCase().includes(query)
-    );
-  }, [searchQuery]);
-
-  // Handle Download Action
-  const handleDownload = (resource) => {
-    setDownloadingId(resource.id);
-    const content = `Study Material: ${resource.title}\nCourse: ${resource.course}\nAuthor: ${resource.author}\nDownloaded via JRU Student Portal`;
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${resource.course}_Reviewer.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-
-    setTimeout(() => {
-      setDownloadingId(null);
-    }, 1500);
   };
 
-  return (
-    <div className="w-full space-y-6 text-slate-800">
-      
-      {/* Top Banner / Student Profile Header */}
-      <div className="bg-gradient-to-r from-[#002147] via-[#092B54] to-[#001733] text-white p-6 rounded-2xl shadow-md border border-amber-400/40 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
+  const downloadResource = (resource) => {
+    const text = `Study Material: ${resource.title}\nCourse: ${resource.course}\nAuthor: ${resource.author}\nDownloaded via JRU Student Portal`;
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url; link.download = `${resource.course}_Reviewer.txt`; link.click(); URL.revokeObjectURL(url);
+  };
 
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-amber-400 text-[#002147] font-black text-2xl flex items-center justify-center border-2 border-white shadow-md shrink-0">
-              {userData.name.charAt(0)}
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-black tracking-wide">{userData.name}</h1>
-                <span className="bg-amber-400 text-[#002147] text-[10px] font-black uppercase px-2 py-0.5 rounded-full">
-                  {userData.role === 'teacher' ? 'Faculty Account' : 'Student Account'}
-                </span>
-              </div>
-              <p className="text-xs text-slate-300 mt-0.5 flex items-center gap-2">
-                <span>ID: <strong>{userData.studentId}</strong></span>
-                <span>&bull;</span>
-                <span>{userData.yearLevel}</span>
-              </p>
-              <p className="text-xs text-amber-300 font-medium mt-1 flex items-center gap-1">
-                <Building2 className="w-3.5 h-3.5" />
-                {userData.college}
-              </p>
-            </div>
-          </div>
+  const editCourse = course => {
+    setEditing(course.code);
+    setForm({ name: course.name, instructor: course.instructor, schedule: course.schedule, room: course.room });
+  };
+  const saveCourse = event => {
+    event.preventDefault();
+    setCourses(list => list.map(c => c.code === editing ? { ...c, ...form } : c));
+    setEditing(null);
+  };
 
-          <div className="flex items-center gap-3 self-end md:self-center">
-            <button
-              type="button"
-              onClick={handleNavigateToReviewerHub}
-              className="px-3.5 py-2 rounded-xl bg-amber-400 text-[#002147] font-extrabold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm hover:bg-amber-300"
-            >
-              <BookOpen className="w-4 h-4 text-[#002147]" />
-              <span>Reviewer Community</span>
-            </button>
-            <button
-              type="button"
-              onClick={onSignOut}
-              className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Sign Out</span>
-            </button>
+  const tabs = [['overview', 'Overview & Schedule'], ['courses', `My Courses (${courses.length})`], ['reviewers', 'Study Reviewers & Files'], ['policies', 'Rules & Policies (5)']];
+
+  return <div className="w-full space-y-6 text-slate-800">
+    <header className="relative overflow-hidden rounded-2xl border border-amber-400/40 bg-gradient-to-r from-[#002147] via-[#092B54] to-[#001733] p-6 text-white shadow-md">
+      <div className="relative z-10 flex flex-col justify-between gap-5 md:flex-row md:items-center">
+        <div className="flex items-center gap-4">
+          <div className="relative h-16 w-16 shrink-0">
+            <img src={photo ? (photo.startsWith('http') ? photo : `http://127.0.0.1:8000${photo}`) : `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=002147&color=ffffff`} alt="Profile" className="h-16 w-16 rounded-2xl border-2 border-white object-cover shadow-md" />
+            <label title="Change profile picture" className="absolute -bottom-2 -right-2 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-2 border-[#002147] bg-amber-400 text-[#002147] shadow hover:bg-amber-300">
+              <Camera size={14} /><input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={changePhoto} disabled={uploading} />
+            </label>
           </div>
+          <div>
+            <div className="flex flex-wrap items-center gap-2"><h1 className="text-xl font-black sm:text-2xl">{name}</h1><span className="rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black uppercase text-[#002147]">{role === 'teacher' ? 'Faculty Account' : 'Student Account'}</span></div>
+            <p className="mt-1 text-xs text-slate-300">ID: <strong>{studentId}</strong> · {year}</p>
+            <p className="mt-1 flex items-center gap-1 text-xs text-amber-300"><Building2 size={14} />{college}</p>
+            <p className="mt-1 text-[10px] text-slate-300">{uploading ? 'Uploading picture…' : 'Click the camera to change your picture'}</p>
+            {photoError && <p role="alert" className="mt-1 text-xs text-rose-200">{photoError}</p>}{photoSuccess && <p role="status" className="mt-1 text-xs text-emerald-200">{photoSuccess}</p>}
+          </div>
+        </div>
+        <div className="flex items-center gap-3 self-end md:self-center">
+          <Button onClick={goToReviewers} className="flex items-center gap-2 bg-amber-400 text-[#002147] hover:bg-amber-300"><BookOpen size={16}/>Reviewer Community</Button>
+          <Button onClick={onSignOut} className="flex items-center gap-2 border border-white/20 bg-white/10 text-white hover:bg-white/20"><LogOut size={16}/>Sign Out</Button>
         </div>
       </div>
+    </header>
 
-      {/* Quick Academic Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-900 flex items-center justify-center shrink-0">
-            <GraduationCap className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Cumulative GPA</p>
-            <p className="text-lg font-black text-slate-900">{userData.gpa}</p>
-          </div>
-        </div>
+    <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      {[
+        [GraduationCap, 'Cumulative GPA', student?.gpa || 'Not available', 'bg-blue-50 text-blue-900'],
+        [BookOpen, 'Enrolled Courses', `${courses.length} Subjects`, 'bg-amber-50 text-amber-700'],
+        [CheckCircle, 'Academic Status', 'Good Standing', 'bg-emerald-50 text-emerald-700'],
+        [Trophy, 'Honor Points', '450 Pts', 'bg-purple-50 text-purple-700'],
+      ].map(([Icon, label, value, color]) => <div key={label} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${color}`}><Icon size={20}/></div><div><p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{label}</p><p className="text-sm font-black text-slate-900">{value}</p></div></div>)}
+    </section>
 
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center shrink-0">
-            <BookOpen className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Enrolled Courses</p>
-            <p className="text-lg font-black text-slate-900">{courses.length} Subjects</p>
-          </div>
-        </div>
+    <nav className="flex gap-2 overflow-x-auto border-b border-slate-200">{tabs.map(([key, label]) => <button key={key} onClick={() => setTab(key)} className={`whitespace-nowrap border-b-2 px-4 pb-3 text-xs font-bold ${tab === key ? 'border-[#002147] text-[#002147]' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>{label}</button>)}</nav>
 
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
-            <CheckCircle className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Academic Status</p>
-            <p className="text-xs font-extrabold text-emerald-700">Good Standing</p>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center shrink-0">
-            <Trophy className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Honor Points</p>
-            <p className="text-lg font-black text-slate-900">450 Pts</p>
-          </div>
-        </div>
+    {tab === 'overview' && <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+      <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 lg:col-span-7">
+        <h2 className="flex items-center gap-2 text-sm font-black"><Calendar size={16} className="text-amber-600"/>Current Class Schedule</h2>
+        {courses.map(course => <div key={course.code} className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+          {editing === course.code ? <form onSubmit={saveCourse} className="space-y-2">{['name', 'instructor', 'schedule', 'room'].map(field => <label key={field} className="block text-xs font-bold capitalize text-slate-700">{field}<input required value={form[field]} onChange={e => setForm({ ...form, [field]: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 p-2 text-xs font-normal"/></label>)}<Button className="bg-[#002147] text-white">Save</Button><Button onClick={() => setEditing(null)} className="ml-2 bg-slate-200 text-slate-700">Cancel</Button></form> : <div className="flex items-center justify-between gap-3"><div><span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-black text-amber-900">{course.code}</span><h3 className="mt-1 text-xs font-bold">{course.name}</h3><p className="mt-1 text-[11px] text-slate-500"><Clock size={12} className="mr-1 inline"/>{course.schedule}</p><p className="mt-1 text-[11px] text-slate-500">Room: {course.room}</p><p className="mt-1 text-[11px] font-semibold text-slate-600">{course.instructor}</p></div><Button onClick={() => editCourse(course)} className="bg-[#002147] text-amber-300">Edit</Button></div>}
+        </div>)}
       </div>
+      <div className="space-y-4 lg:col-span-5"><div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5"><h2 className="flex items-center gap-2 text-sm font-black"><Sparkles size={16} className="text-amber-500"/>Portal Quick Links</h2><Button onClick={goToReviewers} className="mr-2 bg-amber-100 text-[#002147]">Browse Reviewers</Button><Button onClick={() => onNavigate?.('leaderboard')} className="bg-slate-100 text-slate-800"><Trophy size={14} className="mr-1 inline"/>Honor Roll</Button></div><div className="space-y-2 rounded-2xl border border-amber-400/30 bg-[#002147] p-5 text-white"><p className="text-[10px] font-black uppercase text-amber-400">Official Announcement</p><h3 className="text-xs font-bold">Midterm Examination Schedule Released</h3><p className="text-[11px] text-slate-300">Check your course rooms or the LMS portal for exam room assignments.</p></div></div>
+    </section>}
 
-      {/* Tab Navigation */}
-      <div className="flex border-b border-slate-200 gap-2 overflow-x-auto">
-        <button
-          type="button"
-          onClick={() => setActiveTab('overview')}
-          className={`pb-3 px-4 text-xs font-bold transition-colors cursor-pointer border-b-2 whitespace-nowrap ${
-            activeTab === 'overview'
-              ? 'border-[#002147] text-[#002147]'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          Overview &amp; Schedule
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('courses')}
-          className={`pb-3 px-4 text-xs font-bold transition-colors cursor-pointer border-b-2 whitespace-nowrap ${
-            activeTab === 'courses'
-              ? 'border-[#002147] text-[#002147]'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          My Courses ({courses.length})
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('reviewers')}
-          className={`pb-3 px-4 text-xs font-bold transition-colors cursor-pointer border-b-2 whitespace-nowrap ${
-            activeTab === 'reviewers'
-              ? 'border-[#002147] text-[#002147]'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          Study Reviewers &amp; Files
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('policies')}
-          className={`pb-3 px-4 text-xs font-bold transition-colors cursor-pointer border-b-2 whitespace-nowrap ${
-            activeTab === 'policies'
-              ? 'border-[#002147] text-[#002147]'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          Rules &amp; Policies (5)
-        </button>
-      </div>
-      
-      {/* TAB CONTENT 1: Overview */}
-      {activeTab === 'overview' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+    {tab === 'courses' && <section className="grid grid-cols-1 gap-4 rounded-2xl border border-slate-200 bg-white p-5 md:grid-cols-2"><h2 className="text-sm font-black md:col-span-2">Enrolled Subjects & Grade Overviews</h2>{courses.map(c => <article key={c.code} className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4"><div className="flex justify-between gap-2"><div><span className="rounded bg-amber-400 px-2 py-0.5 text-xs font-black">{c.code}</span><h3 className="mt-1 text-sm font-bold">{c.name}</h3></div><strong>Grade {c.grade}</strong></div><p className="border-t pt-2 text-xs text-slate-600">Faculty: {c.instructor}<br/>Schedule: {c.schedule}<br/>Location: {c.room}</p></article>)}</section>}
 
-          {/* Class Schedule Card */}
-          <div className="lg:col-span-7 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-black text-slate-900 flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-amber-600" />
-                <span>Current Class Schedule</span>
-              </h2>
-              <span className="text-[11px] text-slate-500 font-medium">
-                1st Semester
-              </span>
-            </div>
+    {tab === 'reviewers' && <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5"><div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div><h2 className="text-sm font-black">Saved Study Materials & Shared Reviewers</h2><p className="mt-1 text-xs text-slate-500">Browse or download sample study materials.</p></div><div className="relative"><Search size={14} className="absolute left-3 top-2.5 text-slate-400"/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search materials..." className="rounded-xl border bg-slate-50 py-2 pl-8 pr-8 text-xs"/>{query && <button onClick={() => setQuery('')} className="absolute right-2 top-2"><X size={14}/></button>}</div></div>{filteredResources.length ? filteredResources.map(r => <div key={r.id} className="flex items-center justify-between gap-3 rounded-xl border bg-slate-50 p-4"><div><span className="rounded bg-[#002147] px-2 py-0.5 text-[10px] text-white">{r.course}</span><h3 className="mt-1 text-xs font-bold">{r.title}</h3><p className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">By {r.author} · <Star size={12} className="text-amber-500"/>{r.rating} · {r.downloads} downloads</p></div><Button onClick={() => downloadResource(r)} className="flex shrink-0 items-center gap-1 bg-[#002147] text-amber-300"><Download size={14}/>Download</Button></div>) : <p className="p-6 text-center text-xs text-slate-500">No materials match “{query}”.</p>}</section>}
 
-            <div className="space-y-3">
-              {courses.map((course) => (
-                <div
-                  key={course.code}
-                  className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 hover:border-amber-300 transition-colors"
-                >
-                  {editingCourse === course.code ? (
-                    <form onSubmit={saveCourseChanges} className="space-y-3">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 mb-1">
-                          Course Name
-                        </label>
-                        <input
-                          required
-                          value={courseForm.name}
-                          onChange={(e) =>
-                            setCourseForm({
-                              ...courseForm,
-                              name: e.target.value,
-                            })
-                          }
-                          className="w-full p-2 text-xs border border-slate-300 rounded-lg"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 mb-1">
-                          Instructor
-                        </label>
-                        <input
-                          required
-                          value={courseForm.instructor}
-                          onChange={(e) =>
-                            setCourseForm({
-                              ...courseForm,
-                              instructor: e.target.value,
-                            })
-                          }
-                          className="w-full p-2 text-xs border border-slate-300 rounded-lg"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 mb-1">
-                          Class Schedule
-                        </label>
-                        <input
-                          required
-                          value={courseForm.schedule}
-                          onChange={(e) =>
-                            setCourseForm({
-                              ...courseForm,
-                              schedule: e.target.value,
-                            })
-                          }
-                          placeholder="Mon/Wed 10:00 AM - 11:30 AM"
-                          className="w-full p-2 text-xs border border-slate-300 rounded-lg"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 mb-1">
-                          Room
-                        </label>
-                        <input
-                          required
-                          value={courseForm.room}
-                          onChange={(e) =>
-                            setCourseForm({
-                              ...courseForm,
-                              room: e.target.value,
-                            })
-                          }
-                          className="w-full p-2 text-xs border border-slate-300 rounded-lg"
-                        />
-                      </div>
-
-                      <div className="flex gap-2">
-                        <button
-                          type="submit"
-                          className="px-3 py-2 bg-[#002147] text-amber-300 text-xs font-bold rounded-lg hover:bg-blue-900"
-                        >
-                          Save Changes
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setEditingCourse(null)}
-                          className="px-3 py-2 bg-slate-200 text-slate-700 text-xs font-bold rounded-lg"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </form>
-                  ) : (
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-black text-xs text-amber-900 bg-amber-100 px-2 py-0.5 rounded">
-                            {course.code}
-                          </span>
-
-                          <h3 className="text-xs font-bold text-slate-800">
-                            {course.name}
-                          </h3>
-                        </div>
-
-                        <p className="text-[11px] text-slate-500 mt-1">
-                          <Clock className="w-3 h-3 inline mr-1" />
-                          {course.schedule}
-                        </p>
-
-                        <p className="text-[11px] text-slate-500 mt-1">
-                          Room: {course.room}
-                        </p>
-
-                        <p className="text-[11px] font-semibold text-slate-600 mt-1">
-                          {course.instructor}
-                        </p>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => startEditingCourse(course)}
-                        className="shrink-0 px-3 py-1.5 bg-[#002147] text-amber-300 text-xs font-bold rounded-lg hover:bg-blue-900"
-                      >
-                        Edit
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Quick Actions & University Bulletins */}
-          <div className="lg:col-span-5 space-y-4">
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
-              <h2 className="text-sm font-black text-slate-900 flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-amber-500" />
-                <span>Portal Quick Links</span>
-              </h2>
-
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <button
-                  type="button"
-                  onClick={handleNavigateToReviewerHub}
-                  className="p-3 bg-amber-50 hover:bg-amber-100/80 rounded-xl border border-amber-300 text-[#002147] font-bold text-left transition-colors flex flex-col gap-1 cursor-pointer"
-                >
-                  <BookOpen className="w-4 h-4 text-amber-600" />
-                  <span>Browse Reviewers</span>
-                  <span className="text-[10px] text-amber-800 font-normal">
-                    Go to Reviewer Community
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    typeof onNavigate === 'function'
-                      ? onNavigate('leaderboard')
-                      : null
-                  }
-                  className="p-3 bg-slate-50 hover:bg-amber-50 rounded-xl border border-slate-200 text-slate-800 font-bold text-left transition-colors flex flex-col gap-1 cursor-pointer"
-                >
-                  <Trophy className="w-4 h-4 text-amber-500" />
-                  <span>Honor Roll</span>
-                  <span className="text-[10px] text-slate-500 font-normal">
-                    Check Leaderboard
-                  </span>
-                </button>
-              </div>
-            </div>
-
-            <div className="bg-[#002147] text-white p-5 rounded-2xl border border-amber-400/30 space-y-2">
-              <span className="text-[10px] font-black uppercase text-amber-400 tracking-wider">
-                Official Announcement
-              </span>
-              <h3 className="text-xs font-bold">
-                Midterm Examination Schedule Released
-              </h3>
-              <p className="text-[11px] text-slate-300 leading-relaxed">
-                Check your course rooms or the Canvas LMS portal for complete exam room assignments.
-              </p>
-            </div>
-          </div>
-
-        </div>
-      )}
-
-      {/* TAB CONTENT 2: Courses */}
-      {activeTab === 'courses' && (
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-          <h2 className="text-sm font-black text-slate-900">Enrolled Subjects &amp; Grade Overviews</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {courses.map((course) => (
-              <div key={course.code} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <span className="text-xs font-black text-blue-950 bg-amber-400 px-2 py-0.5 rounded">
-                      {course.code}
-                    </span>
-                    <h3 className="text-sm font-bold text-slate-900 mt-1">{course.name}</h3>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] text-slate-500 block uppercase font-semibold">Grade</span>
-                    <span className="text-base font-black text-blue-950">{course.grade}</span>
-                  </div>
-                </div>
-                <div className="text-xs text-slate-600 space-y-1 pt-2 border-t border-slate-200/60">
-                  <p><strong>Faculty:</strong> {course.instructor}</p>
-                  <p><strong>Schedule:</strong> {course.schedule}</p>
-                  <p><strong>Location:</strong> {course.room}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* TAB CONTENT 3: Study Resources & Files */}
-      {activeTab === 'reviewers' && (
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-black text-slate-900">Saved Study Materials &amp; Shared Reviewers</h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Looking for community notes? Head to the{' '}
-                <button 
-                  type="button"
-                  onClick={handleNavigateToReviewerHub} 
-                  className="text-amber-600 font-bold underline cursor-pointer"
-                >
-                  Reviewer Community
-                </button>.
-              </p>
-            </div>
-            <div className="relative w-full sm:w-64">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search materials..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-100 text-xs pl-8 pr-8 py-1.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-400"
-              />
-              {searchQuery && (
-                <button 
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            {filteredResources.length > 0 ? (
-              filteredResources.map((resource) => (
-                <div key={resource.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold bg-[#002147] text-white px-2 py-0.5 rounded">
-                        {resource.course}
-                      </span>
-                      <h3 className="text-xs font-bold text-slate-900">{resource.title}</h3>
-                    </div>
-                    <p className="text-[11px] text-slate-500 flex items-center gap-3">
-                      <span>By {resource.author}</span>
-                      <span>&bull;</span>
-                      <span className="flex items-center gap-1 text-amber-600 font-semibold">
-                        <Star className="w-3 h-3 fill-amber-400 text-amber-400" /> {resource.rating}
-                      </span>
-                      <span>&bull;</span>
-                      <span>{resource.downloads} downloads</span>
-                    </p>
-                  </div>
-                  <button 
-                    type="button"
-                    onClick={() => handleDownload(resource)}
-                    disabled={downloadingId === resource.id}
-                    className="px-3 py-1.5 bg-[#002147] text-amber-300 font-bold text-xs rounded-lg hover:bg-blue-900 transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-75"
-                  >
-                    {downloadingId === resource.id ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>Saved</span>
-                      </>
-                    ) : (
-                      <>
-                        <Download className="w-3.5 h-3.5" />
-                        <span>Download</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              ))
-            ) : (
-              <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                <p className="text-xs text-slate-500 font-medium">No study materials match "{searchQuery}".</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* TAB CONTENT 4: Rules & Policies - EXACTLY 5 POLICIES */}
-      {activeTab === 'policies' && (
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-6">
-          <div className="border-b border-slate-100 pb-4 flex items-center justify-between flex-wrap gap-2">
-            <div>
-              <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-amber-500" />
-                <span>Student Portal Rules &amp; Acceptable Use Policy</span>
-              </h2>
-              <p className="text-xs text-slate-500 mt-1">
-                Institutional guidelines governing academic resource usage and student portal conduct.
-              </p>
-            </div>
-            <span className="text-[11px] font-bold text-slate-600 bg-amber-100 text-amber-900 px-3 py-1 rounded-full border border-amber-300">
-              5 Core Guidelines
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-            {portalPolicies.map((policy) => {
-              const PolicyIcon = policy.icon;
-              return (
-                <div key={policy.id} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-                  <div className="flex items-center gap-2 text-[#002147] font-bold">
-                    <PolicyIcon className="w-4 h-4 text-amber-600 shrink-0" />
-                    <h3>{policy.id}. {policy.title}</h3>
-                  </div>
-                  <ul className="list-disc list-inside text-slate-600 space-y-1.5 leading-relaxed pl-1">
-                    {policy.rules.map((rule, idx) => (
-                      <li key={idx}>{rule}</li>
-                    ))}
-                  </ul>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="pt-3 border-t border-slate-100 text-[11px] text-slate-500 flex items-center justify-between">
-            <span className="flex items-center gap-1 text-slate-600 font-medium">
-              <Check className="w-3.5 h-3.5 text-emerald-600" />
-              All account actions are governed by the Jose Rizal University Student Code of Conduct.
-            </span>
-            <span className="italic">JRU IT Infrastructure System</span>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+    {tab === 'policies' && <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5"><h2 className="flex items-center gap-2 text-sm font-black"><ShieldCheck size={18} className="text-amber-500"/>Student Portal Rules & Acceptable Use Policy</h2><div className="grid grid-cols-1 gap-4 text-xs md:grid-cols-2">{policies.map((policy, i) => { const Icon = policy.icon; return <article key={policy.title} className="space-y-2 rounded-xl border bg-slate-50 p-4"><h3 className="flex items-center gap-2 font-bold text-[#002147]"><Icon size={16} className="text-amber-600"/>{i + 1}. {policy.title}</h3><ul className="list-inside list-disc space-y-1 text-slate-600">{policy.rules.map(rule => <li key={rule}>{rule}</li>)}</ul></article>; })}</div><p className="border-t pt-3 text-[11px] text-slate-500">JRU IT Infrastructure System · Follow university policies and protect account information.</p></section>}
+  </div>;
 }
