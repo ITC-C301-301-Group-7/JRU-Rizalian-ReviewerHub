@@ -118,11 +118,19 @@ export const LoginForm = ({ onSuccess, onForgotPassword, onSwitchToSignUp,}) => 
       throw new Error('The server did not return a user profile.');
     }
 
-    onSuccess(data.user);
-  } catch (err) {
-    setError(
-      err.message || 'Unable to connect to the server. Please try again.'
-    );
+    onSuccess({...data.user,
+    token: data.token,
+    studentNumber: data.user.student_number,
+    facultyId: data.user.faculty_id,
+    yearLevel: data.user.year_level,
+    points: 0,
+    contributions: 0,
+    contributedReviewersCount: 0,
+    upvotesReceived: 0,
+    savedReviewersCount: 0,
+    badgesEarned: [],
+  });
+  
   } finally {
     setIsLoading(false);
   }

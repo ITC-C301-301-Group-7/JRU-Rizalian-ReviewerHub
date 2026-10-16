@@ -49,12 +49,74 @@ export function StudentDashboardPreview({ student, onSignOut, onNavigate }) {
   };
 
 
-  const courses = [
-    { code: 'MGT 301', name: 'Strategic Management', instructor: 'Prof. A. Santos', schedule: 'Mon/Wed 10:00 AM - 11:30 AM', room: 'Building A - Room 302', grade: '1.25' },
-    { code: 'ACC 202', name: 'Financial Accounting & Reporting', instructor: 'Dr. M. Reyes', schedule: 'Tue/Thu 1:00 PM - 2:30 PM', room: 'Building B - Room 104', grade: '1.50' },
-    { code: 'GE 105', name: 'Purposive Communication', instructor: 'Prof. L. Garcia', schedule: 'Fri 8:00 AM - 11:00 AM', room: 'Online / LMS', grade: '1.00' },
-    { code: 'IT 101', name: 'Introduction to Computing', instructor: 'Engr. J. Cruz', schedule: 'Tue/Thu 9:00 AM - 10:30 AM', room: 'IT Lab 3', grade: '1.25' }
-  ];
+  
+  const [courses, setCourses] = useState([
+    {
+      code: 'MGT 301',
+      name: 'Strategic Management',
+      instructor: 'Prof. A. Santos',
+      schedule: 'Mon/Wed 10:00 AM - 11:30 AM',
+      room: 'Building A - Room 302',
+      grade: '1.25',
+    },
+    {
+      code: 'ACC 202',
+      name: 'Financial Accounting & Reporting',
+      instructor: 'Dr. M. Reyes',
+      schedule: 'Tue/Thu 1:00 PM - 2:30 PM',
+      room: 'Building B - Room 104',
+      grade: '1.50',
+    },
+    {
+      code: 'GE 105',
+      name: 'Purposive Communication',
+      instructor: 'Prof. L. Garcia',
+      schedule: 'Fri 8:00 AM - 11:00 AM',
+      room: 'Online / LMS',
+      grade: '1.00',
+    },
+    {
+      code: 'IT 101',
+      name: 'Introduction to Computing',
+      instructor: 'Engr. J. Cruz',
+      schedule: 'Tue/Thu 9:00 AM - 10:30 AM',
+      room: 'IT Lab 3',
+      grade: '1.25',
+    },
+  ]);
+
+  const [editingCourse, setEditingCourse] = useState(null);
+
+  const [courseForm, setCourseForm] = useState({
+    name: '',
+    instructor: '',
+    schedule: '',
+    room: '',
+  });
+
+  const startEditingCourse = (course) => {
+    setEditingCourse(course.code);
+    setCourseForm({
+      name: course.name,
+      instructor: course.instructor,
+      schedule: course.schedule,
+      room: course.room,
+    });
+  };
+
+  const saveCourseChanges = (event) => {
+    event.preventDefault();
+
+    setCourses((previousCourses) =>
+      previousCourses.map((course) =>
+        course.code === editingCourse
+          ? { ...course, ...courseForm }
+          : course
+      )
+    );
+
+    setEditingCourse(null);
+  };
 
   const studyResources = [
     { id: 1, title: 'Comprehensive Strategic Management Midterm Reviewer', course: 'MGT 301', author: 'J. Dela Cruz', rating: 4.9, downloads: 342, date: 'Oct 2024' },
@@ -284,10 +346,11 @@ export function StudentDashboardPreview({ student, onSignOut, onNavigate }) {
           Rules &amp; Policies (5)
         </button>
       </div>
-
+      
       {/* TAB CONTENT 1: Overview */}
       {activeTab === 'overview' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
           {/* Class Schedule Card */}
           <div className="lg:col-span-7 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
             <div className="flex items-center justify-between">
@@ -295,26 +358,141 @@ export function StudentDashboardPreview({ student, onSignOut, onNavigate }) {
                 <Calendar className="w-4 h-4 text-amber-600" />
                 <span>Current Class Schedule</span>
               </h2>
-              <span className="text-[11px] text-slate-500 font-medium">1st Semester</span>
+              <span className="text-[11px] text-slate-500 font-medium">
+                1st Semester
+              </span>
             </div>
 
             <div className="space-y-3">
               {courses.map((course) => (
-                <div key={course.code} className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between gap-4 hover:border-amber-300 transition-colors">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-black text-xs text-[#002147] bg-amber-100 text-amber-900 px-2 py-0.5 rounded">
-                        {course.code}
-                      </span>
-                      <h3 className="text-xs font-bold text-slate-800">{course.name}</h3>
+                <div
+                  key={course.code}
+                  className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 hover:border-amber-300 transition-colors"
+                >
+                  {editingCourse === course.code ? (
+                    <form onSubmit={saveCourseChanges} className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          Course Name
+                        </label>
+                        <input
+                          required
+                          value={courseForm.name}
+                          onChange={(e) =>
+                            setCourseForm({
+                              ...courseForm,
+                              name: e.target.value,
+                            })
+                          }
+                          className="w-full p-2 text-xs border border-slate-300 rounded-lg"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          Instructor
+                        </label>
+                        <input
+                          required
+                          value={courseForm.instructor}
+                          onChange={(e) =>
+                            setCourseForm({
+                              ...courseForm,
+                              instructor: e.target.value,
+                            })
+                          }
+                          className="w-full p-2 text-xs border border-slate-300 rounded-lg"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          Class Schedule
+                        </label>
+                        <input
+                          required
+                          value={courseForm.schedule}
+                          onChange={(e) =>
+                            setCourseForm({
+                              ...courseForm,
+                              schedule: e.target.value,
+                            })
+                          }
+                          placeholder="Mon/Wed 10:00 AM - 11:30 AM"
+                          className="w-full p-2 text-xs border border-slate-300 rounded-lg"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          Room
+                        </label>
+                        <input
+                          required
+                          value={courseForm.room}
+                          onChange={(e) =>
+                            setCourseForm({
+                              ...courseForm,
+                              room: e.target.value,
+                            })
+                          }
+                          className="w-full p-2 text-xs border border-slate-300 rounded-lg"
+                        />
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          type="submit"
+                          className="px-3 py-2 bg-[#002147] text-amber-300 text-xs font-bold rounded-lg hover:bg-blue-900"
+                        >
+                          Save Changes
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setEditingCourse(null)}
+                          className="px-3 py-2 bg-slate-200 text-slate-700 text-xs font-bold rounded-lg"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-black text-xs text-amber-900 bg-amber-100 px-2 py-0.5 rounded">
+                            {course.code}
+                          </span>
+
+                          <h3 className="text-xs font-bold text-slate-800">
+                            {course.name}
+                          </h3>
+                        </div>
+
+                        <p className="text-[11px] text-slate-500 mt-1">
+                          <Clock className="w-3 h-3 inline mr-1" />
+                          {course.schedule}
+                        </p>
+
+                        <p className="text-[11px] text-slate-500 mt-1">
+                          Room: {course.room}
+                        </p>
+
+                        <p className="text-[11px] font-semibold text-slate-600 mt-1">
+                          {course.instructor}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => startEditingCourse(course)}
+                        className="shrink-0 px-3 py-1.5 bg-[#002147] text-amber-300 text-xs font-bold rounded-lg hover:bg-blue-900"
+                      >
+                        Edit
+                      </button>
                     </div>
-                    <p className="text-[11px] text-slate-500 mt-1 flex items-center gap-3">
-                      <span className="flex items-center gap-1"><Clock className="w-3 h-3 text-slate-400" /> {course.schedule}</span>
-                      <span>&bull;</span>
-                      <span>{course.room}</span>
-                    </p>
-                  </div>
-                  <span className="text-[11px] font-semibold text-slate-600 shrink-0">{course.instructor}</span>
+                  )}
                 </div>
               ))}
             </div>
@@ -327,36 +505,51 @@ export function StudentDashboardPreview({ student, onSignOut, onNavigate }) {
                 <Sparkles className="w-4 h-4 text-amber-500" />
                 <span>Portal Quick Links</span>
               </h2>
+
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <button 
+                <button
                   type="button"
                   onClick={handleNavigateToReviewerHub}
                   className="p-3 bg-amber-50 hover:bg-amber-100/80 rounded-xl border border-amber-300 text-[#002147] font-bold text-left transition-colors flex flex-col gap-1 cursor-pointer"
                 >
                   <BookOpen className="w-4 h-4 text-amber-600" />
                   <span>Browse Reviewers</span>
-                  <span className="text-[10px] text-amber-800 font-normal">Go to Reviewer Community</span>
+                  <span className="text-[10px] text-amber-800 font-normal">
+                    Go to Reviewer Community
+                  </span>
                 </button>
-                <button 
+
+                <button
                   type="button"
-                  onClick={() => typeof onNavigate === 'function' ? onNavigate('leaderboard') : null}
+                  onClick={() =>
+                    typeof onNavigate === 'function'
+                      ? onNavigate('leaderboard')
+                      : null
+                  }
                   className="p-3 bg-slate-50 hover:bg-amber-50 rounded-xl border border-slate-200 text-slate-800 font-bold text-left transition-colors flex flex-col gap-1 cursor-pointer"
                 >
                   <Trophy className="w-4 h-4 text-amber-500" />
                   <span>Honor Roll</span>
-                  <span className="text-[10px] text-slate-500 font-normal">Check Leaderboard</span>
+                  <span className="text-[10px] text-slate-500 font-normal">
+                    Check Leaderboard
+                  </span>
                 </button>
               </div>
             </div>
 
             <div className="bg-[#002147] text-white p-5 rounded-2xl border border-amber-400/30 space-y-2">
-              <span className="text-[10px] font-black uppercase text-amber-400 tracking-wider">Official Announcement</span>
-              <h3 className="text-xs font-bold">Midterm Examination Schedule Released</h3>
+              <span className="text-[10px] font-black uppercase text-amber-400 tracking-wider">
+                Official Announcement
+              </span>
+              <h3 className="text-xs font-bold">
+                Midterm Examination Schedule Released
+              </h3>
               <p className="text-[11px] text-slate-300 leading-relaxed">
                 Check your course rooms or the Canvas LMS portal for complete exam room assignments.
               </p>
             </div>
           </div>
+
         </div>
       )}
 

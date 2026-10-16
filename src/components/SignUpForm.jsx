@@ -57,52 +57,99 @@ export const SignUpForm = ({ onSuccess, onSwitchToLogin }) => {
   const passwordsMatch =
     formData.password.length > 0 && formData.password === formData.confirmPassword;
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setError(null);
-    if (!formData.firstName.trim() || !formData.lastName.trim()) {
-      setError('Please provide your full legal name.');
-      return;
-    }
-    const idValidationError = getJruIdValidationError(formData.idNumber, role);
-    if (idValidationError) {
-      setError(idValidationError);
-      return;
-    }
-    if (!formData.email.trim()) {
-      setError('Please provide your institutional JRU email address.');
-      return;
-    }
-    if (!hasMinLength || !hasNumber) {
-      setError('Password must be at least 8 characters and include at least 1 number.');
-      return;
-    }
-    if (!passwordsMatch) {
-      setError('Password and confirmation password do not match.');
-      return;
-    }
-    if (!formData.agreedToTerms) {
-      setError('You must accept the JRU Academic Integrity and Code of Conduct.');
-      return;
-    }
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      onSuccess({
-        role,
+  
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setError(null);
+
+  if (!formData.firstName.trim() || !formData.lastName.trim()) {
+    setError('Please provide your full legal name.');
+    return;
+  }
+
+  const idValidationError = getJruIdValidationError(
+    formData.idNumber,
+    role
+  );
+
+  if (idValidationError) {
+    setError(idValidationError);
+    return;
+  }
+
+  if (!formData.email.trim()) {
+    setError('Please provide your JRU email address.');
+    return;
+  }
+
+  if (!hasMinLength || !hasNumber) {
+    setError('Password must be at least 8 characters and include a number.');
+    return;
+  }
+
+  if (!passwordsMatch) {
+    setError('Password and confirmation password do not match.');
+    return;
+  }
+
+  if (!formData.agreedToTerms) {
+    setError('You must accept the academic integrity terms.');
+    return;
+  }
+
+  setIsLoading(true);
+
+  try {
+    const response = await fetch('http://127.0.0.1:8000/api/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
         name: `${formData.firstName.trim()} ${formData.lastName.trim()}`,
-        studentNumber: formData.idNumber.trim(),
-        email: formData.email.toLowerCase().trim(),
-        category: formData.category,
-        department: formData.department,
-        yearLevel: formData.yearLevelOrRank,
-        status: role === 'teacher' ? 'Faculty' : 'Official',
-        contributedReviewersCount: formData.wantToContribute ? 1 : 0,
-        upvotesReceived: 0,
-        savedReviewersCount: 2,
-      });
-    }, 800);
-  };
+        email: formData.email.trim().toLowerCase(),
+        password: formData.password,
+        password_confirmation: formData.confirmPassword,
+        role,
+        student_number:
+          role === 'student' ? formData.idNumber.trim() : null,
+        faculty_id:
+          role === 'teacher' ? formData.idNumber.trim() : null,
+        department: formData.department || null,
+        year_level: formData.yearLevelOrRank || null,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      const message = data.errors
+        ? Object.values(data.errors).flat().join(' ')
+        : data.message || 'Registration failed.';
+
+      throw new Error(message);
+    }
+
+    onSuccess({
+      ...data.user,
+      token: data.token,
+      studentNumber: data.user.student_number,
+      facultyId: data.user.faculty_id,
+      yearLevel: data.user.year_level,
+      points: 0,
+      contributions: 0,
+      contributedReviewersCount: 0,
+      upvotesReceived: 0,
+      savedReviewersCount: 0,
+      badgesEarned: [],
+    });
+  } catch (err) {
+    setError(err.message || 'Unable to connect to the server.');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   return (
     <form id="jru-signup-form" onSubmit={handleSubmit} className="space-y-3.5">
