@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { 
   Trophy, 
   Award, 
@@ -62,44 +62,60 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard }) {
 
   // User Stats State
   const [userStats, setUserStats] = useState({
-    rank: null,
-    points: 0,
-    contributions: 0,
-    badgesEarned: [],
+    rank: 14,
+    points: currentUser?.points || 450,
+    contributions: 5,
+    badgesEarned: ['Verified Student', 'Resource Contributor']
   });
 
   // Community Feed Data State
-  const [reviewersList, setReviewersList] = useState([]);
-  const [isLoadingResources, setIsLoadingResources] = useState(true);
-  const [resourceError, setResourceError] = useState('');
-
-  useEffect(() => {
-    const fetchResources = async () => {
-      try {
-        const response = await fetch(
-          'http://127.0.0.1:8000/api/resources'
-        );
-
-        if (!response.ok) {
-          throw new Error('Unable to load community resources.');
-        }
-
-        const data = await response.json();
-
-        const resources = Array.isArray(data)
-          ? data
-          : data.data ?? data.resources ?? [];
-
-        setReviewersList(resources);
-      } catch (error) {
-        setResourceError(error.message);
-      } finally {
-        setIsLoadingResources(false);
-      }
-    };
-
-    fetchResources();
-  }, []);
+  const [reviewersList, setReviewersList] = useState([
+    {
+      id: 1,
+      title: 'Strategic Management Midterm Comprehensive Exam Reviewer',
+      courseCode: 'MGT 301',
+      author: 'Maria Santos',
+      authorRole: 'Top Contributor',
+      college: 'College of Business Administration',
+      likes: 124,
+      isLiked: false,
+      downloads: 412,
+      comments: 18,
+      rating: 4.9,
+      userRating: 0,
+      date: '2 hours ago'
+    },
+    {
+      id: 2,
+      title: 'Database Management Systems & SQL Query Practice Set',
+      courseCode: 'IT 204',
+      author: 'Jann Dela Cruz',
+      authorRole: 'Top Quizmaster',
+      college: 'College of Computer Studies',
+      likes: 98,
+      isLiked: false,
+      downloads: 305,
+      comments: 12,
+      rating: 4.8,
+      userRating: 0,
+      date: 'Yesterday'
+    },
+    {
+      id: 3,
+      title: 'Anatomy and Physiology Nursing Board Reviewer Summary',
+      courseCode: 'NUR 102',
+      author: 'Rhea Alonzo',
+      authorRole: 'Verified Scholar',
+      college: 'College of Nursing & Health Sciences',
+      likes: 86,
+      isLiked: false,
+      downloads: 240,
+      comments: 9,
+      rating: 4.9,
+      userRating: 0,
+      date: '3 days ago'
+    }
+  ]);
 
   // Official Institutional Resources Data
   const officialResources = [
@@ -221,95 +237,40 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard }) {
   };
 
   // Upload Submit Function
-  
-  const handleUploadSubmit = async (e) => {
+  const handleUploadSubmit = (e) => {
     e.preventDefault();
-
-    if (!uploadForm.title.trim() || !uploadForm.courseCode.trim()) {
-      alert('Please enter a title and course code.');
+    if (!uploadForm.title || !uploadForm.courseCode) {
+      alert('Please fill in required fields.');
       return;
     }
 
-    if (!uploadForm.file) {
-      alert('Please select a file to upload.');
-      return;
-    }
+    const newReviewer = {
+      id: Date.now(),
+      title: uploadForm.title,
+      courseCode: uploadForm.courseCode.toUpperCase(),
+      author: currentUser?.name || 'Rizalian Student',
+      authorRole: 'Active Contributor',
+      college: uploadForm.college,
+      likes: 0,
+      isLiked: false,
+      downloads: 0,
+      comments: 0,
+      rating: 5.0,
+      userRating: 0,
+      date: 'Just now'
+    };
 
-    if (!currentUser?.token) {
-      alert('Please sign in again before uploading.');
-      return;
-    }
+    setReviewersList([newReviewer, ...reviewersList]);
+    setUserStats({
+      ...userStats,
+      points: userStats.points + 50,
+      contributions: userStats.contributions + 1
+    });
 
-    const formData = new FormData();
-    formData.append('title', uploadForm.title.trim());
-    formData.append('course_code', uploadForm.courseCode.trim());
-    formData.append('college', uploadForm.college);
-    formData.append('description', uploadForm.description);
-    formData.append('file', uploadForm.file);
-
-    try {
-      const response = await fetch(`${API_URL}/resources`, {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          Authorization: `Bearer ${currentUser.token}`,
-        },
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        const message = data.errors
-          ? Object.values(data.errors).flat().join(' ')
-          : data.message || 'Upload failed.';
-
-        throw new Error(message);
-      }
-
-      const resourceResponse = await fetch(`${API_URL}/resources`, {
-        headers: { Accept: 'application/json' },
-      });
-
-      if (!resourceResponse.ok) {
-        throw new Error('Uploaded, but the reviewer list could not refresh.');
-      }
-
-      const resources = await resourceResponse.json();
-
-      setReviewersList(
-        resources.map((item) => ({
-         ...item,
-         likes: 0,
-         isLiked: false,
-         downloads: 0,
-         comments: 0,
-         rating: 0,
-         userRating: 0,
-         date: 'Published',
-        }))
-      );
-
-      setUploadForm({
-        title: '',
-        courseCode: '',
-        college: 'College of Business Administration',
-        description: '',
-        file: null,
-      });
-
-      setIsUploadModalOpen(false);
-      setUserStats((previous) => ({
-        ...previous,
-        contributions: previous.contributions + 1,
-        points: previous.points + 50,
-      }));
-
-      setUploadSuccessMessage('Reviewer uploaded successfully!');
-      setTimeout(() => setUploadSuccessMessage(''), 5000);
-    } catch (error) {
-      alert(error.message || 'Unable to upload the file.');
-    }
+    setUploadForm({ title: '', courseCode: '', college: 'College of Business Administration', description: '', file: null });
+    setIsUploadModalOpen(false);
+    setUploadSuccessMessage('Successfully published! You earned +50 Contribution Points.');
+    setTimeout(() => setUploadSuccessMessage(''), 5000);
   };
 
   // Filtered Reviewers List
@@ -462,112 +423,68 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard }) {
         </div>
       )}
 
-      
       {/* TAB 1: PEER REVIEWERS FEED */}
       {activeTab === 'feed' && (
         <div className="space-y-3">
-
-          {isLoadingResources ? (
-            <p className="text-center text-slate-500 py-8">
-              Loading peer reviewers and resources...
-            </p>
-          ) : resourceError ? (
-            <p className="text-center text-red-500 py-8">
-              {resourceError}
-            </p>
-          ) : filteredReviewers.length === 0 ? (
-            <p className="text-center text-slate-500 py-8">
-              No community resources are available yet.
-            </p>
-          ) : (
-            filteredReviewers.map((item) => (
-              <div
-                key={item.id}
-                className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-black bg-blue-950 text-amber-300 px-2 py-0.5 rounded">
-                        {item.courseCode}
-                      </span>
-                      <span className="text-[10px] font-bold text-slate-500">
-                        {item.college}
-                      </span>
-                    </div>
-
-                    <h3 className="text-sm font-extrabold text-slate-900 mt-1">
-                      {item.title}
-                    </h3>
-                  </div>
-
+          {filteredReviewers.map((item) => (
+            <div key={item.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
+              <div className="flex items-start justify-between gap-4">
+                <div>
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setSelectedReviewerForReport(item)}
-                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Report Content"
-                    >
-                      <Flag className="w-4 h-4" />
-                    </button>
+                    <span className="text-[10px] font-black bg-blue-950 text-amber-300 px-2 py-0.5 rounded">
+                      {item.courseCode}
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-500">{item.college}</span>
                   </div>
+                  <h3 className="text-sm font-extrabold text-slate-900 mt-1">{item.title}</h3>
                 </div>
 
-                <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-lg text-xs">
-                  <span className="text-[11px] font-bold text-slate-600">
-                    Rate Usefulness:
-                  </span>
-
-                  <div className="flex items-center gap-1">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <button
-                        key={star}
-                        onClick={() => handleRateReviewer(item.id, star)}
-                        className="cursor-pointer"
-                      >
-                        <Star
-                          className={`w-4 h-4 ${
-                            star <= (item.userRating || item.rating)
-                              ? 'fill-amber-400 text-amber-400'
-                              : 'text-slate-300'
-                          }`}
-                        />
-                      </button>
-                    ))}
-                  </div>
-
-                  <span className="text-[10px] text-slate-400">
-                    ({item.rating} overall)
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
-                  <span>
-                    By <strong>{item.author}</strong> &bull; {item.date}
-                  </span>
-
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => handleLikeReviewer(item.id)}
-                      className="flex items-center gap-1 hover:text-blue-900 cursor-pointer"
-                    >
-                      <ThumbsUp
-                        className={`w-3.5 h-3.5 ${
-                          item.isLiked ? 'fill-blue-900 text-blue-900' : ''
-                        }`}
-                      />
-                      <span>{item.likes}</span>
-                    </button>
-
-                    <button className="flex items-center gap-1 px-3 py-1 bg-blue-950 text-amber-300 rounded-lg font-bold cursor-pointer">
-                      <Download className="w-3.5 h-3.5" />
-                      <span>Download</span>
-                    </button>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => setSelectedReviewerForReport(item)}
+                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Report Content"
+                  >
+                    <Flag className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
-            ))
-          )}
 
+              <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-lg text-xs">
+                <span className="text-[11px] font-bold text-slate-600">Rate Usefulness:</span>
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      onClick={() => handleRateReviewer(item.id, star)}
+                      className="cursor-pointer"
+                    >
+                      <Star className={`w-4 h-4 ${
+                        star <= (item.userRating || item.rating) 
+                          ? 'fill-amber-400 text-amber-400' 
+                          : 'text-slate-300'
+                      }`} />
+                    </button>
+                  ))}
+                </div>
+                <span className="text-[10px] text-slate-400">({item.rating} overall)</span>
+              </div>
+
+              <div className="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
+                <span>By <strong>{item.author}</strong> &bull; {item.date}</span>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => handleLikeReviewer(item.id)} className="flex items-center gap-1 hover:text-blue-900 cursor-pointer">
+                    <ThumbsUp className={`w-3.5 h-3.5 ${item.isLiked ? 'fill-blue-900 text-blue-900' : ''}`} />
+                    <span>{item.likes}</span>
+                  </button>
+                  <button className="flex items-center gap-1 px-3 py-1 bg-blue-950 text-amber-300 rounded-lg font-bold cursor-pointer">
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -889,49 +806,18 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard }) {
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 focus:outline-none focus:border-amber-400"
                 />
               </div>
- 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-              <label className="font-bold text-slate-700 block mb-1">
-                  Course Code *
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. MGT 301"
-                value={uploadForm.courseCode}
-                onChange={(e) =>
-                  setUploadForm({
-                    ...uploadForm,
-                    courseCode: e.target.value,
-                })
-              }
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 focus:outline-none focus:border-amber-400"
-              />
-              </div>
 
-              {/* NEW: File Upload */}
-              <div>
-              <label className="font-bold text-slate-700 block mb-1">
-                Upload File *
-              </label>
-              <input
-                type="file"
-                required
-                accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.webp"
-                onChange={(e) =>
-                  setUploadForm({
-                  ...uploadForm,
-                  file: e.target.files?.[0] || null,
-                  })
-                 }
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 focus:outline-none focus:border-amber-400"
-                />
-                    {uploadForm.file && (
-                      <p className="mt-2 text-sm text-slate-600">
-                        Selected: {uploadForm.file.name}
-                      </p>
-                    )}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Course Code *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. MGT 301"
+                    value={uploadForm.courseCode}
+                    onChange={(e) => setUploadForm({ ...uploadForm, courseCode: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 focus:outline-none focus:border-amber-400"
+                  />
                 </div>
 
                 <div>
