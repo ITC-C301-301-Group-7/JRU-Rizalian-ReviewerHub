@@ -10,12 +10,13 @@ import {
 } from "lucide-react";
 
 import PdfPreview from "../components/PdfPreview";
+import { fetchBlob, saveBlob } from "../utils/authedFile";
 
 const API_URL = (
     import.meta.env.VITE_API_URL || "http://127.0.0.1:8000"
 ).replace(/\/$/, "");
 
-export default function PeerReviewerFeed() {
+export default function PeerReviewerFeed({ token }) {
     const [resources, setResources] = useState([]);
     const [search, setSearch] = useState("");
     const [college, setCollege] = useState("All Colleges");
@@ -23,6 +24,8 @@ export default function PeerReviewerFeed() {
     const [ratings, setRatings] = useState({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [downloadingId, setDownloadingId] = useState(null);
+    const [downloadError, setDownloadError] = useState(null);
 
     const fetchResources = useCallback(async () => {
         setLoading(true);
@@ -58,6 +61,23 @@ export default function PeerReviewerFeed() {
     useEffect(() => {
         fetchResources();
     }, [fetchResources]);
+
+    const handleDownload = async (resource) => {
+        setDownloadingId(resource.id);
+        setDownloadError(null);
+
+        try {
+            const blob = await fetchBlob(resource.downloadUrl, token);
+            saveBlob(blob, resource.filename || "reviewer");
+        } catch (err) {
+            setDownloadError({
+                id: resource.id,
+                message: err.message || "Download failed.",
+            });
+        } finally {
+            setDownloadingId(null);
+        }
+    };
 
     const colleges = [
         "All Colleges",
@@ -266,14 +286,26 @@ export default function PeerReviewerFeed() {
                                                 </button>
                                             )}
 
-                                            <a
-                                                href={resource.downloadUrl}
-                                                className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#002147] px-4 py-2 text-sm font-semibold text-yellow-300 transition hover:bg-[#003366]"
+                                            <button
+                                                type="button"
+                                                onClick={() => handleDownload(resource)}
+                                                disabled={downloadingId === resource.id}
+                                                className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#002147] px-4 py-2 text-sm font-semibold text-yellow-300 transition hover:bg-[#003366] disabled:opacity-60"
                                             >
-                                                <Download className="h-4 w-4" />
+                                                {downloadingId === resource.id ? (
+                                                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                                                ) : (
+                                                    <Download className="h-4 w-4" />
+                                                )}
                                                 Download
-                                            </a>
+                                            </button>
                                         </div>
+
+                                        {downloadError?.id === resource.id && (
+                                            <p role="alert" className="text-xs text-rose-600">
+                                                {downloadError.message}
+                                            </p>
+                                        )}
                                     </div>
                                 </article>
                             );
@@ -298,6 +330,7 @@ export default function PeerReviewerFeed() {
             {selectedResource && (
                 <PdfPreview
                     resource={selectedResource}
+                    token={token}
                     onClose={() => setSelectedResource(null)}
                 />
             )}

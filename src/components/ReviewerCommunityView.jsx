@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { 
   Trophy, 
   Award, 
@@ -25,8 +25,54 @@ import {
   ChevronUp,
   HelpCircle,
   CheckCircle,
-  TrendingUp
+  TrendingUp,
+  Trash2,
+  Eye,
+  LoaderCircle
 } from 'lucide-react';
+import PdfPreview from './PdfPreview';
+import { fetchBlob, saveBlob } from '../utils/Authedfile';
+import { API_URL } from '../utils/Session';
+
+const MAX_UPLOAD_BYTES = 20 * 1024 * 1024; // matches the backend limit (20 MB)
+const ALLOWED_EXTENSIONS = ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'jpg', 'jpeg', 'png', 'webp'];
+const PREVIEWABLE_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+
+const toAbsoluteUrl = (url) =>
+  !url ? '' : url.startsWith('http') ? url : `${API_URL}${url}`;
+
+const timeAgo = (iso) => {
+  if (!iso) return '';
+  const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (Number.isNaN(seconds)) return '';
+  if (seconds < 60) return 'Just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} hr ago`;
+  if (seconds < 172800) return 'Yesterday';
+  if (seconds < 2592000) return `${Math.floor(seconds / 86400)} days ago`;
+  return new Date(iso).toLocaleDateString();
+};
+
+// Maps one API resource to the shape this view renders.
+const toFeedItem = (r) => ({
+  id: r.id,
+  title: r.title,
+  courseCode: r.courseCode || '',
+  college: r.college || '',
+  description: r.description || '',
+  author: r.author || 'ReviewerHub User',
+  userId: r.userId,
+  filename: r.filename,
+  mimeType: r.mimeType,
+  previewUrl: toAbsoluteUrl(r.previewUrl),
+  downloadUrl: toAbsoluteUrl(r.downloadUrl),
+  date: timeAgo(r.createdAt),
+  // Likes and ratings are not stored by the backend yet (this device only).
+  likes: 0,
+  isLiked: false,
+  rating: null,
+  userRating: 0
+});
 
 export function ReviewerCommunityView({ currentUser, onBackToDashboard }) {
   // Navigation & Filter States
@@ -68,54 +114,55 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard }) {
     badgesEarned: ['Verified Student', 'Resource Contributor']
   });
 
-  // Community Feed Data State
-  const [reviewersList, setReviewersList] = useState([
-    {
-      id: 1,
-      title: 'Strategic Management Midterm Comprehensive Exam Reviewer',
-      courseCode: 'MGT 301',
-      author: 'Maria Santos',
-      authorRole: 'Top Contributor',
-      college: 'College of Business Administration',
-      likes: 124,
-      isLiked: false,
-      downloads: 412,
-      comments: 18,
-      rating: 4.9,
-      userRating: 0,
-      date: '2 hours ago'
-    },
-    {
-      id: 2,
-      title: 'Database Management Systems & SQL Query Practice Set',
-      courseCode: 'IT 204',
-      author: 'Jann Dela Cruz',
-      authorRole: 'Top Quizmaster',
-      college: 'College of Computer Studies',
-      likes: 98,
-      isLiked: false,
-      downloads: 305,
-      comments: 12,
-      rating: 4.8,
-      userRating: 0,
-      date: 'Yesterday'
-    },
-    {
-      id: 3,
-      title: 'Anatomy and Physiology Nursing Board Reviewer Summary',
-      courseCode: 'NUR 102',
-      author: 'Rhea Alonzo',
-      authorRole: 'Verified Scholar',
-      college: 'College of Nursing & Health Sciences',
-      likes: 86,
-      isLiked: false,
-      downloads: 240,
-      comments: 9,
-      rating: 4.9,
-      userRating: 0,
-      date: '3 days ago'
+  // Community Feed Data (loaded from the Laravel API)
+  const token = currentUser?.token;
+  const [reviewersList, setReviewersList] = useState([]);
+  const [feedLoading, setFeedLoading] = useState(true);
+  const [feedError, setFeedError] = useState('');
+  const [previewResource, setPreviewResource] = useState(null);
+  const [busyId, setBusyId] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+
+  const loadReviewers = useCallback(async (signal, silent = false) => {
+    if (!silent) setFeedLoading(true);
+    setFeedError('');
+
+    try {
+      const response = await fetch(`${API_URL}/api/resources`, {
+        headers: { Accept: 'application/json' },
+        signal
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to load reviewers (${response.status}).`);
+      }
+
+      const data = await response.json();
+
+      setReviewersList(prev => {
+        const local = new Map(prev.map(item => [item.id, item]));
+        return (Array.isArray(data) ? data : []).map(raw => {
+          const item = toFeedItem(raw);
+          const old = local.get(item.id);
+          // keep this device's like / rating state across refreshes
+          return old ? { ...item, likes: old.likes, isLiked: old.isLiked, userRating: old.userRating } : item;
+        });
+      });
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        setFeedError(err.message || 'Unable to load reviewers.');
+      }
+    } finally {
+      if (!signal?.aborted) setFeedLoading(false);
     }
-  ]);
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    loadReviewers(controller.signal);
+    return () => controller.abort();
+  }, [loadReviewers]);
 
   // Official Institutional Resources Data
   const officialResources = [
@@ -236,41 +283,129 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard }) {
     );
   };
 
-  // Upload Submit Function
-  const handleUploadSubmit = (e) => {
+  // File picker: validate type and size before uploading
+  const handleFileChosen = (e) => {
+    const file = e.target.files?.[0] || null;
+    setUploadError('');
+
+    if (file) {
+      const extension = file.name.split('.').pop().toLowerCase();
+
+      if (!ALLOWED_EXTENSIONS.includes(extension)) {
+        e.target.value = '';
+        setUploadForm(form => ({ ...form, file: null }));
+        setUploadError(`Unsupported file type. Allowed: ${ALLOWED_EXTENSIONS.join(', ')}.`);
+        return;
+      }
+
+      if (file.size > MAX_UPLOAD_BYTES) {
+        e.target.value = '';
+        setUploadForm(form => ({ ...form, file: null }));
+        setUploadError('The file must be 20 MB or smaller.');
+        return;
+      }
+    }
+
+    setUploadForm(form => ({ ...form, file }));
+  };
+
+  // Upload Submit Function (POST /api/resources)
+  const handleUploadSubmit = async (e) => {
     e.preventDefault();
-    if (!uploadForm.title || !uploadForm.courseCode) {
-      alert('Please fill in required fields.');
+    setUploadError('');
+
+    if (!token) {
+      setUploadError('Please sign in again before uploading.');
+      return;
+    }
+    if (!uploadForm.title.trim() || !uploadForm.courseCode.trim()) {
+      setUploadError('Please fill in the title and course code.');
+      return;
+    }
+    if (!uploadForm.file) {
+      setUploadError('Please attach a file.');
       return;
     }
 
-    const newReviewer = {
-      id: Date.now(),
-      title: uploadForm.title,
-      courseCode: uploadForm.courseCode.toUpperCase(),
-      author: currentUser?.name || 'Rizalian Student',
-      authorRole: 'Active Contributor',
-      college: uploadForm.college,
-      likes: 0,
-      isLiked: false,
-      downloads: 0,
-      comments: 0,
-      rating: 5.0,
-      userRating: 0,
-      date: 'Just now'
-    };
+    const body = new FormData();
+    body.append('title', uploadForm.title.trim());
+    body.append('course_code', uploadForm.courseCode.trim());
+    body.append('college', uploadForm.college);
+    if (uploadForm.description.trim()) {
+      body.append('description', uploadForm.description.trim());
+    }
+    body.append('file', uploadForm.file);
 
-    setReviewersList([newReviewer, ...reviewersList]);
-    setUserStats({
-      ...userStats,
-      points: userStats.points + 50,
-      contributions: userStats.contributions + 1
-    });
+    setUploading(true);
 
-    setUploadForm({ title: '', courseCode: '', college: 'College of Business Administration', description: '', file: null });
-    setIsUploadModalOpen(false);
-    setUploadSuccessMessage('Successfully published! You earned +50 Contribution Points.');
-    setTimeout(() => setUploadSuccessMessage(''), 5000);
+    try {
+      const response = await fetch(`${API_URL}/api/resources`, {
+        method: 'POST',
+        headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+        body
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(
+          data.errors
+            ? Object.values(data.errors).flat().join(' ')
+            : data.message || `Upload failed (${response.status}).`
+        );
+      }
+
+      await loadReviewers(undefined, true);
+      setUserStats(stats => ({
+        ...stats,
+        points: stats.points + 50,
+        contributions: stats.contributions + 1
+      }));
+
+      setUploadForm({ title: '', courseCode: '', college: 'College of Business Administration', description: '', file: null });
+      setIsUploadModalOpen(false);
+      setUploadSuccessMessage('Successfully published! You earned +50 Contribution Points.');
+      setTimeout(() => setUploadSuccessMessage(''), 5000);
+    } catch (err) {
+      setUploadError(err.message || 'Upload failed. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Download through an authenticated request (a plain link cannot send the token)
+  const handleDownloadReviewer = async (item) => {
+    setBusyId(item.id);
+    try {
+      saveBlob(await fetchBlob(item.downloadUrl, token), item.filename || 'reviewer');
+    } catch (err) {
+      alert(err.message || 'Download failed.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  // Owners can delete their own uploads (DELETE /api/resources/{id})
+  const handleDeleteReviewer = async (item) => {
+    if (!window.confirm(`Delete "${item.title}"? This cannot be undone.`)) return;
+
+    setBusyId(item.id);
+    try {
+      const response = await fetch(`${API_URL}/api/resources/${item.id}`, {
+        method: 'DELETE',
+        headers: { Accept: 'application/json', Authorization: `Bearer ${token}` }
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.message || `Delete failed (${response.status}).`);
+      }
+
+      setReviewersList(prev => prev.filter(r => r.id !== item.id));
+    } catch (err) {
+      alert(err.message || 'Delete failed.');
+    } finally {
+      setBusyId(null);
+    }
   };
 
   // Filtered Reviewers List
@@ -327,7 +462,7 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard }) {
               </span>
             </div>
             <button 
-              onClick={() => setIsUploadModalOpen(true)}
+              onClick={() => { setUploadError(''); setIsUploadModalOpen(true); }}
               className="px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-blue-950 font-bold text-xs rounded-xl transition-all shadow-md flex items-center gap-2 cursor-pointer shrink-0"
             >
               <UploadCloud className="w-4 h-4" />
@@ -426,6 +561,28 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard }) {
       {/* TAB 1: PEER REVIEWERS FEED */}
       {activeTab === 'feed' && (
         <div className="space-y-3">
+          {feedLoading && (
+            <div className="flex items-center justify-center gap-2 p-8 text-xs text-slate-500">
+              <LoaderCircle className="w-4 h-4 animate-spin" />
+              <span>Loading reviewers...</span>
+            </div>
+          )}
+
+          {!feedLoading && feedError && (
+            <div role="alert" className="bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl p-4 flex items-center justify-between gap-3">
+              <span>{feedError}</span>
+              <button type="button" onClick={() => loadReviewers()} className="font-bold underline cursor-pointer">
+                Retry
+              </button>
+            </div>
+          )}
+
+          {!feedLoading && !feedError && filteredReviewers.length === 0 && (
+            <div className="bg-white p-8 rounded-xl border border-slate-200 text-center text-xs text-slate-500">
+              No reviewers found. Try a different search, or share the first one!
+            </div>
+          )}
+
           {filteredReviewers.map((item) => (
             <div key={item.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
               <div className="flex items-start justify-between gap-4">
@@ -437,6 +594,9 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard }) {
                     <span className="text-[10px] font-bold text-slate-500">{item.college}</span>
                   </div>
                   <h3 className="text-sm font-extrabold text-slate-900 mt-1">{item.title}</h3>
+                  {item.description && (
+                    <p className="text-xs text-slate-600 mt-1 line-clamp-2">{item.description}</p>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -460,14 +620,16 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard }) {
                       className="cursor-pointer"
                     >
                       <Star className={`w-4 h-4 ${
-                        star <= (item.userRating || item.rating) 
+                        star <= (item.userRating || item.rating || 0) 
                           ? 'fill-amber-400 text-amber-400' 
                           : 'text-slate-300'
                       }`} />
                     </button>
                   ))}
                 </div>
-                <span className="text-[10px] text-slate-400">({item.rating} overall)</span>
+                {item.rating && (
+                  <span className="text-[10px] text-slate-400">({item.rating} overall)</span>
+                )}
               </div>
 
               <div className="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
@@ -477,8 +639,38 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard }) {
                     <ThumbsUp className={`w-3.5 h-3.5 ${item.isLiked ? 'fill-blue-900 text-blue-900' : ''}`} />
                     <span>{item.likes}</span>
                   </button>
-                  <button className="flex items-center gap-1 px-3 py-1 bg-blue-950 text-amber-300 rounded-lg font-bold cursor-pointer">
-                    <Download className="w-3.5 h-3.5" />
+                  {PREVIEWABLE_TYPES.includes(item.mimeType) && (
+                    <button
+                      type="button"
+                      onClick={() => setPreviewResource(item)}
+                      className="flex items-center gap-1 px-3 py-1 border border-blue-950 text-blue-950 rounded-lg font-bold cursor-pointer hover:bg-blue-50"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Preview</span>
+                    </button>
+                  )}
+                  {currentUser?.id != null && item.userId === currentUser.id && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteReviewer(item)}
+                      disabled={busyId === item.id}
+                      title="Delete my upload"
+                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg cursor-pointer disabled:opacity-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadReviewer(item)}
+                    disabled={busyId === item.id}
+                    className="flex items-center gap-1 px-3 py-1 bg-blue-950 text-amber-300 rounded-lg font-bold cursor-pointer disabled:opacity-60"
+                  >
+                    {busyId === item.id ? (
+                      <LoaderCircle className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Download className="w-3.5 h-3.5" />
+                    )}
                     <span>Download</span>
                   </button>
                 </div>
@@ -846,11 +1038,23 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard }) {
                 />
               </div>
 
-              <div className="border-2 border-dashed border-slate-200 rounded-xl p-4 text-center bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer">
+              <label className="block border-2 border-dashed border-slate-200 rounded-xl p-4 text-center bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer">
+                <input
+                  type="file"
+                  accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.webp"
+                  onChange={handleFileChosen}
+                  className="sr-only"
+                />
                 <UploadCloud className="w-8 h-8 text-slate-400 mx-auto mb-1" />
-                <span className="font-bold text-slate-700 block">Click to attach document</span>
-                <span className="text-[10px] text-slate-400">PDF, DOCX, or PNG (Max 25MB)</span>
-              </div>
+                <span className="font-bold text-slate-700 block break-all">
+                  {uploadForm.file ? uploadForm.file.name : 'Click to attach document'}
+                </span>
+                <span className="text-[10px] text-slate-400">PDF, DOCX, PPTX, or image (Max 20MB)</span>
+              </label>
+
+              {uploadError && (
+                <p role="alert" className="text-[11px] font-semibold text-red-600">{uploadError}</p>
+              )}
 
               <div className="pt-2 flex items-center justify-end gap-2">
                 <button
@@ -862,15 +1066,29 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard }) {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-amber-400 hover:bg-amber-300 text-blue-950 rounded-xl font-bold shadow-md cursor-pointer flex items-center gap-1.5"
+                  disabled={uploading}
+                  className="px-5 py-2 bg-amber-400 hover:bg-amber-300 text-blue-950 rounded-xl font-bold shadow-md cursor-pointer flex items-center gap-1.5 disabled:opacity-60"
                 >
-                  <Zap className="w-4 h-4 fill-blue-950 text-blue-950" />
-                  <span>Publish &amp; Earn +50 Pts</span>
+                  {uploading ? (
+                    <LoaderCircle className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Zap className="w-4 h-4 fill-blue-950 text-blue-950" />
+                  )}
+                  <span>{uploading ? 'Uploading...' : 'Publish &amp; Earn +50 Pts'}</span>
                 </button>
               </div>
             </form>
           </div>
         </div>
+      )}
+
+      {/* PDF / image preview (authenticated blob) */}
+      {previewResource && (
+        <PdfPreview
+          resource={previewResource}
+          token={token}
+          onClose={() => setPreviewResource(null)}
+        />
       )}
 
       {/* MODAL 2: HOW TO EARN POINTS GUIDE */}

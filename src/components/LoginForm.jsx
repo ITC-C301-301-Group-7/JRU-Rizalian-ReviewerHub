@@ -129,8 +129,13 @@ export const LoginForm = ({ onSuccess, onForgotPassword, onSwitchToSignUp,}) => 
     upvotesReceived: 0,
     savedReviewersCount: 0,
     badgesEarned: [],
-  });
-  
+  }, formData.rememberMe);
+  } catch (err) {
+    setError(
+      err instanceof TypeError
+        ? 'Unable to reach the server. Check your connection and try again.'
+        : err.message || 'Login failed. Please try again.'
+    );
   } finally {
     setIsLoading(false);
   }

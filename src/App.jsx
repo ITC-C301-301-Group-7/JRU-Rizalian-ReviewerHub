@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { JruLogo } from './components/JruLogo';
 import { LoginForm } from './components/LoginForm';
 import { SignUpForm } from './components/SignUpForm';
@@ -6,6 +6,13 @@ import { ForgotPasswordView } from './components/ForgotPasswordView';
 import { StudentDashboardPreview } from './components/StudentDashboardPreview';
 import { ReviewerCommunityView } from './components/ReviewerCommunityView';
 import { CampusFooter } from './components/CampusFooter';
+import {
+  clearToken,
+  fetchCurrentUser,
+  loadToken,
+  logoutRequest,
+  saveToken,
+} from './utils/Session';
 import { 
   Shield, 
   Sparkles, 
@@ -29,13 +36,42 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('login');
   const [authenticatedUser, setAuthenticatedUser] = useState(null);
   const [currentView, setCurrentView] = useState('dashboard'); // 'dashboard' | 'community' | 'leaderboard'
+  // True while we check a saved token against the server on first load.
+  const [restoringSession, setRestoringSession] = useState(() =>
+    Boolean(loadToken())
+  );
 
-  const handleAuthSuccess = (user) => {
+  // Restore the signed-in user after a page refresh.
+  useEffect(() => {
+    const token = loadToken();
+    if (!token) return undefined;
+
+    const controller = new AbortController();
+
+    fetchCurrentUser(token, controller.signal)
+      .then((user) => setAuthenticatedUser(user))
+      .catch((err) => {
+        if (err.name === 'AbortError') return;
+        // Token is invalid or expired: forget it. Keep it on network errors.
+        if (err.status === 401) clearToken();
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setRestoringSession(false);
+      });
+
+    return () => controller.abort();
+  }, []);
+
+  const handleAuthSuccess = (user, remember = true) => {
+    saveToken(user.token, remember);
     setAuthenticatedUser(user);
     setCurrentView('dashboard');
   };
 
   const handleSignOut = () => {
+    // Revoke the token on the server, then forget it locally.
+    logoutRequest(authenticatedUser?.token);
+    clearToken();
     setAuthenticatedUser(null);
     setActiveTab('login');
     setCurrentView('dashboard');
@@ -72,6 +108,14 @@ export default function App() {
     contributions: 5,
     badgesEarned: ['Verified Student', 'First Upload']
   };
+
+  if (restoringSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#06152B] text-sm text-slate-200">
+        Restoring your session...
+      </div>
+    );
+  }
 
   return (
     <div

@@ -1,8 +1,16 @@
+import { useEffect, useState } from 'react';
+import { X, Download, FileText, LoaderCircle } from 'lucide-react';
+import { fetchBlob, saveBlob } from '../utils/authedFile';
 
-import { useEffect } from 'react';
-import { X, Download, FileText } from 'lucide-react';
+export default function PdfPreview({ resource, token, onClose }) {
+  const [blobUrl, setBlobUrl] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [downloading, setDownloading] = useState(false);
 
-export default function PdfPreview({ resource, onClose }) {
+  const previewUrl = resource?.previewUrl;
+  const downloadUrl = resource?.downloadUrl;
+
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') {
@@ -17,10 +25,52 @@ export default function PdfPreview({ resource, onClose }) {
     };
   }, [onClose]);
 
-  if (!resource) return null;
+  // Load the protected PDF with the Bearer token and show it via a blob URL.
+  useEffect(() => {
+    if (!previewUrl) return undefined;
 
-  const previewUrl = resource.previewUrl;
-  const downloadUrl = resource.downloadUrl;
+    const controller = new AbortController();
+    let createdUrl = null;
+
+    setLoading(true);
+    setError('');
+    setBlobUrl(null);
+
+    fetchBlob(previewUrl, token, controller.signal)
+      .then((blob) => {
+        createdUrl = URL.createObjectURL(blob);
+        setBlobUrl(createdUrl);
+      })
+      .catch((err) => {
+        if (err.name !== 'AbortError') {
+          setError(err.message || 'Unable to load the preview.');
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+
+    return () => {
+      controller.abort();
+      if (createdUrl) URL.revokeObjectURL(createdUrl);
+    };
+  }, [previewUrl, token]);
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    setError('');
+
+    try {
+      const blob = await fetchBlob(downloadUrl, token);
+      saveBlob(blob, resource.filename || 'reviewer.pdf');
+    } catch (err) {
+      setError(err.message || 'Download failed.');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  if (!resource) return null;
 
   return (
     <div
@@ -48,15 +98,19 @@ export default function PdfPreview({ resource, onClose }) {
 
           <div className="flex shrink-0 items-center gap-2">
             {downloadUrl && (
-              <a
-                href={downloadUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-1 rounded-lg bg-amber-400 px-3 py-2 text-xs font-bold text-[#002147] hover:bg-amber-300"
+              <button
+                type="button"
+                onClick={handleDownload}
+                disabled={downloading}
+                className="flex items-center gap-1 rounded-lg bg-amber-400 px-3 py-2 text-xs font-bold text-[#002147] hover:bg-amber-300 disabled:opacity-60"
               >
-                <Download className="h-4 w-4" />
+                {downloading ? (
+                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
                 <span className="hidden sm:inline">Download</span>
-              </a>
+              </button>
             )}
 
             <button
@@ -72,9 +126,13 @@ export default function PdfPreview({ resource, onClose }) {
 
         {/* Actual PDF document */}
         <div className="min-h-0 flex-1 bg-slate-200">
-          {previewUrl ? (
+          {loading ? (
+            <div className="flex h-full items-center justify-center">
+              <LoaderCircle className="h-8 w-8 animate-spin text-slate-500" />
+            </div>
+          ) : blobUrl ? (
             <iframe
-              src={previewUrl}
+              src={blobUrl}
               title={`PDF preview: ${resource.title || 'Document'}`}
               className="h-full w-full border-0"
             />
@@ -84,9 +142,11 @@ export default function PdfPreview({ resource, onClose }) {
               <h3 className="font-bold text-slate-800">
                 PDF preview unavailable
               </h3>
-              <p className="mt-2 max-w-md text-sm text-slate-500">
-                This resource does not have a preview URL. Check the Laravel
-                API and the file path for this document.
+              <p className="mt-2 max-w-md text-sm text-slate-500" role="alert">
+                {error ||
+                  (previewUrl
+                    ? 'The preview could not be loaded.'
+                    : 'This resource does not have a preview URL.')}
               </p>
             </div>
           )}
