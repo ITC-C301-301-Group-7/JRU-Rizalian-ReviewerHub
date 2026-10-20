@@ -77,6 +77,11 @@ export default function App() {
     setCurrentView('dashboard');
   };
 
+  // Merge fields returned by the API (e.g. a new profile_photo_url) into the signed-in user.
+  const handleUserUpdated = (updatedUser) => {
+    setAuthenticatedUser((previous) => (previous ? { ...previous, ...updatedUser } : previous));
+  };
+
   const handleNavigate = (destination) => {
     if (destination === 'ReviewerCommunityView' || destination === 'community') {
       setCurrentView('community');
@@ -187,6 +192,7 @@ export default function App() {
                 onSignOut={handleSignOut}
                 onBack={handleSignOut}
                 onNavigate={handleNavigate}
+                onUserUpdated={handleUserUpdated}
               />
             )}
 

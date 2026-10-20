@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { 
   Trophy, 
   Award, 
@@ -31,10 +31,11 @@ import {
   LoaderCircle
 } from 'lucide-react';
 import PdfPreview from './PdfPreview';
-import { fetchBlob, saveBlob } from '../utils/Authedfile';
-import { API_URL } from '../utils/Session';
+import { fetchBlob, saveBlob } from '../utils/authedFile';
+import { API_URL } from '../utils/session';
 
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024; // matches the backend limit (20 MB)
+const PAGE_SIZE = 12; // reviewers loaded per request
 const ALLOWED_EXTENSIONS = ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'jpg', 'jpeg', 'png', 'webp'];
 const PREVIEWABLE_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
 
@@ -119,17 +120,28 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard }) {
   const [reviewersList, setReviewersList] = useState([]);
   const [feedLoading, setFeedLoading] = useState(true);
   const [feedError, setFeedError] = useState('');
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [pagination, setPagination] = useState({ page: 1, lastPage: 1, total: 0 });
+  const requestIdRef = useRef(0); // lets a newer request replace an older one
   const [previewResource, setPreviewResource] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
 
-  const loadReviewers = useCallback(async (signal, silent = false) => {
-    if (!silent) setFeedLoading(true);
+  // Loads one page of reviewers. Search and college filtering happen on the server.
+  const loadReviewers = useCallback(async ({ page = 1, append = false, silent = false, signal } = {}) => {
+    const requestId = ++requestIdRef.current;
+
+    if (append) setLoadingMore(true);
+    else if (!silent) setFeedLoading(true);
     setFeedError('');
 
     try {
-      const response = await fetch(`${API_URL}/api/resources`, {
+      const params = new URLSearchParams({ page: String(page), per_page: String(PAGE_SIZE) });
+      if (searchQuery.trim()) params.set('search', searchQuery.trim());
+      if (selectedCollege !== 'All') params.set('college', selectedCollege);
+
+      const response = await fetch(`${API_URL}/api/resources?${params}`, {
         headers: { Accept: 'application/json' },
         signal
       });
@@ -139,29 +151,51 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard }) {
       }
 
       const data = await response.json();
+      if (requestId !== requestIdRef.current) return; // a newer request replaced this one
+
+      const incoming = Array.isArray(data.data) ? data.data : [];
 
       setReviewersList(prev => {
         const local = new Map(prev.map(item => [item.id, item]));
-        return (Array.isArray(data) ? data : []).map(raw => {
+        const mapped = incoming.map(raw => {
           const item = toFeedItem(raw);
           const old = local.get(item.id);
           // keep this device's like / rating state across refreshes
           return old ? { ...item, likes: old.likes, isLiked: old.isLiked, userRating: old.userRating } : item;
         });
+
+        if (!append) return mapped;
+
+        const seen = new Set(prev.map(item => item.id));
+        return [...prev, ...mapped.filter(item => !seen.has(item.id))];
+      });
+
+      setPagination({
+        page: data.current_page ?? page,
+        lastPage: data.last_page ?? 1,
+        total: data.total ?? incoming.length
       });
     } catch (err) {
-      if (err.name !== 'AbortError') {
+      if (err.name !== 'AbortError' && requestId === requestIdRef.current) {
         setFeedError(err.message || 'Unable to load reviewers.');
       }
     } finally {
-      if (!signal?.aborted) setFeedLoading(false);
+      if (requestId === requestIdRef.current) {
+        setFeedLoading(false);
+        setLoadingMore(false);
+      }
     }
-  }, []);
+  }, [searchQuery, selectedCollege]);
 
+  // Reload page 1 when the filters change (waits 300 ms while the user is typing).
   useEffect(() => {
     const controller = new AbortController();
-    loadReviewers(controller.signal);
-    return () => controller.abort();
+    const timer = setTimeout(() => loadReviewers({ signal: controller.signal }), 300);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [loadReviewers]);
 
   // Official Institutional Resources Data
@@ -354,7 +388,7 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard }) {
         );
       }
 
-      await loadReviewers(undefined, true);
+      await loadReviewers({ silent: true });
       setUserStats(stats => ({
         ...stats,
         points: stats.points + 50,
@@ -401,6 +435,7 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard }) {
       }
 
       setReviewersList(prev => prev.filter(r => r.id !== item.id));
+      setPagination(p => ({ ...p, total: Math.max(0, p.total - 1) }));
     } catch (err) {
       alert(err.message || 'Delete failed.');
     } finally {
@@ -409,13 +444,8 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard }) {
   };
 
   // Filtered Reviewers List
-  const filteredReviewers = reviewersList.filter(item => {
-    const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          item.courseCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          item.author.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCollege = selectedCollege === 'All' || item.college.includes(selectedCollege);
-    return matchesSearch && matchesCollege;
-  });
+  // Search and college filtering are done by the API, so the list is shown as loaded.
+  const filteredReviewers = reviewersList;
 
   return (
     <div className="w-full space-y-6 text-slate-800">
@@ -583,7 +613,7 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard }) {
             </div>
           )}
 
-          {filteredReviewers.map((item) => (
+          {!feedLoading && filteredReviewers.map((item) => (
             <div key={item.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -677,6 +707,25 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard }) {
               </div>
             </div>
           ))}
+
+          {!feedLoading && !feedError && reviewersList.length > 0 && (
+            <div className="flex flex-col items-center gap-2 pt-2">
+              <p className="text-[11px] text-slate-500">
+                Showing {reviewersList.length} of {pagination.total}
+              </p>
+              {pagination.page < pagination.lastPage && (
+                <button
+                  type="button"
+                  onClick={() => loadReviewers({ page: pagination.page + 1, append: true })}
+                  disabled={loadingMore}
+                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-blue-950 border border-blue-950 rounded-xl hover:bg-blue-50 cursor-pointer disabled:opacity-60"
+                >
+                  {loadingMore && <LoaderCircle className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{loadingMore ? 'Loading...' : 'Load more'}</span>
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 
