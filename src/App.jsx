@@ -12,7 +12,7 @@ import {
   loadToken,
   logoutRequest,
   saveToken,
-} from './utils/Session';
+} from './utils/session';
 import { 
   Shield, 
   Sparkles, 
