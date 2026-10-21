@@ -122,4 +122,4 @@ Then restart both servers. If you see "table not found", you missed `php artisan
 
 - Never commit `.env`, `vendor/` or `node_modules/`.
 - Run `git pull` before you start working and before you push.
-- Work on your own branch, for example `git checkout -b feature-your-name`, then open a pull request.
+- Work on your own branch, for example `git checkout -b feature-your-name`, then open a pull request. (Only when you don't how to use Github)
