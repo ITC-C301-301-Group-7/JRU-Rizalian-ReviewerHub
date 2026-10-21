@@ -1,16 +1,11 @@
 import React, { useMemo, useState } from 'react';
+import { SchedulePanel, useSchedule } from './SchedulePanel';
+import { API_URL } from '../utils/Session';
 import {
-  BookOpen, GraduationCap, LogOut, Trophy, Calendar, Clock, Download,
+  BookOpen, GraduationCap, LogOut, Trophy, Download,
   Star, Search, CheckCircle, Building2, Sparkles, ShieldCheck, Lock,
   UserCheck, Check, X, AlertTriangle, Camera
 } from 'lucide-react';
-
-const initialCourses = [
-  { code: 'MGT 301', name: 'Strategic Management', instructor: 'Prof. A. Santos', schedule: 'Mon/Wed 10:00 AM - 11:30 AM', room: 'Building A - Room 302', grade: '1.25' },
-  { code: 'ACC 202', name: 'Financial Accounting & Reporting', instructor: 'Dr. M. Reyes', schedule: 'Tue/Thu 1:00 PM - 2:30 PM', room: 'Building B - Room 104', grade: '1.50' },
-  { code: 'GE 105', name: 'Purposive Communication', instructor: 'Prof. L. Garcia', schedule: 'Fri 8:00 AM - 11:00 AM', room: 'Online / LMS', grade: '1.00' },
-  { code: 'IT 101', name: 'Introduction to Computing', instructor: 'Engr. J. Cruz', schedule: 'Tue/Thu 9:00 AM - 10:30 AM', room: 'IT Lab 3', grade: '1.25' },
-];
 
 const resources = [
   { id: 1, title: 'Comprehensive Strategic Management Midterm Reviewer', course: 'MGT 301', author: 'J. Dela Cruz', rating: 4.9, downloads: 342 },
@@ -33,9 +28,8 @@ const Button = ({ children, onClick, className = '', ...props }) => (
 export function StudentDashboardPreview({ student, onSignOut, onNavigate, onUserUpdated }) {
   const [tab, setTab] = useState('overview');
   const [query, setQuery] = useState('');
-  const [courses, setCourses] = useState(initialCourses);
-  const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ name: '', instructor: '', schedule: '', room: '' });
+  const schedule = useSchedule(student?.token); // saved class schedule (add / edit / delete)
+  const courses = schedule.courses;
   const [uploading, setUploading] = useState(false);
   const [photoError, setPhotoError] = useState('');
   const [photoSuccess, setPhotoSuccess] = useState('');
@@ -66,7 +60,7 @@ export function StudentDashboardPreview({ student, onSignOut, onNavigate, onUser
     setUploading(true);
 
   try {
-  const response = await fetch('http://127.0.0.1:8000/api/profile/photo', {
+  const response = await fetch(`${API_URL}/api/profile/photo`, {
     method: 'POST',
     headers: { Accept: 'application/json', Authorization: `Bearer ${student.token}`,},
     body,
@@ -101,16 +95,6 @@ export function StudentDashboardPreview({ student, onSignOut, onNavigate, onUser
     link.href = url; link.download = `${resource.course}_Reviewer.txt`; link.click(); URL.revokeObjectURL(url);
   };
 
-  const editCourse = course => {
-    setEditing(course.code);
-    setForm({ name: course.name, instructor: course.instructor, schedule: course.schedule, room: course.room });
-  };
-  const saveCourse = event => {
-    event.preventDefault();
-    setCourses(list => list.map(c => c.code === editing ? { ...c, ...form } : c));
-    setEditing(null);
-  };
-
   const tabs = [['overview', 'Overview & Schedule'], ['courses', `My Courses (${courses.length})`], ['reviewers', 'Study Reviewers & Files'], ['policies', 'Rules & Policies (5)']];
 
   return <div className="w-full space-y-6 text-slate-800">
@@ -118,7 +102,7 @@ export function StudentDashboardPreview({ student, onSignOut, onNavigate, onUser
       <div className="relative z-10 flex flex-col justify-between gap-5 md:flex-row md:items-center">
         <div className="flex items-center gap-4">
           <div className="relative h-16 w-16 shrink-0">
-            <img src={photo ? (photo.startsWith('http') ? photo : `http://127.0.0.1:8000${photo}`) : `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=002147&color=ffffff`} alt="Profile" className="h-16 w-16 rounded-2xl border-2 border-white object-cover shadow-md" />
+            <img src={photo ? (photo.startsWith('http') ? photo : `${API_URL}${photo}`) : `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=002147&color=ffffff`} alt="Profile" className="h-16 w-16 rounded-2xl border-2 border-white object-cover shadow-md" />
             <label title="Change profile picture" className="absolute -bottom-2 -right-2 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-2 border-[#002147] bg-amber-400 text-[#002147] shadow hover:bg-amber-300">
               <Camera size={14} /><input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={changePhoto} disabled={uploading} />
             </label>
@@ -150,16 +134,11 @@ export function StudentDashboardPreview({ student, onSignOut, onNavigate, onUser
     <nav className="flex gap-2 overflow-x-auto border-b border-slate-200">{tabs.map(([key, label]) => <button key={key} onClick={() => setTab(key)} className={`whitespace-nowrap border-b-2 px-4 pb-3 text-xs font-bold ${tab === key ? 'border-[#002147] text-[#002147]' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>{label}</button>)}</nav>
 
     {tab === 'overview' && <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-      <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 lg:col-span-7">
-        <h2 className="flex items-center gap-2 text-sm font-black"><Calendar size={16} className="text-amber-600"/>Current Class Schedule</h2>
-        {courses.map(course => <div key={course.code} className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
-          {editing === course.code ? <form onSubmit={saveCourse} className="space-y-2">{['name', 'instructor', 'schedule', 'room'].map(field => <label key={field} className="block text-xs font-bold capitalize text-slate-700">{field}<input required value={form[field]} onChange={e => setForm({ ...form, [field]: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 p-2 text-xs font-normal"/></label>)}<Button className="bg-[#002147] text-white">Save</Button><Button onClick={() => setEditing(null)} className="ml-2 bg-slate-200 text-slate-700">Cancel</Button></form> : <div className="flex items-center justify-between gap-3"><div><span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-black text-amber-900">{course.code}</span><h3 className="mt-1 text-xs font-bold">{course.name}</h3><p className="mt-1 text-[11px] text-slate-500"><Clock size={12} className="mr-1 inline"/>{course.schedule}</p><p className="mt-1 text-[11px] text-slate-500">Room: {course.room}</p><p className="mt-1 text-[11px] font-semibold text-slate-600">{course.instructor}</p></div><Button onClick={() => editCourse(course)} className="bg-[#002147] text-amber-300">Edit</Button></div>}
-        </div>)}
-      </div>
+      <SchedulePanel schedule={schedule} />
       <div className="space-y-4 lg:col-span-5"><div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5"><h2 className="flex items-center gap-2 text-sm font-black"><Sparkles size={16} className="text-amber-500"/>Portal Quick Links</h2><Button onClick={goToReviewers} className="mr-2 bg-amber-100 text-[#002147]">Browse Reviewers</Button><Button onClick={() => onNavigate?.('leaderboard')} className="bg-slate-100 text-slate-800"><Trophy size={14} className="mr-1 inline"/>Honor Roll</Button></div><div className="space-y-2 rounded-2xl border border-amber-400/30 bg-[#002147] p-5 text-white"><p className="text-[10px] font-black uppercase text-amber-400">Official Announcement</p><h3 className="text-xs font-bold">Midterm Examination Schedule Released</h3><p className="text-[11px] text-slate-300">Check your course rooms or the LMS portal for exam room assignments.</p></div></div>
     </section>}
 
-    {tab === 'courses' && <section className="grid grid-cols-1 gap-4 rounded-2xl border border-slate-200 bg-white p-5 md:grid-cols-2"><h2 className="text-sm font-black md:col-span-2">Enrolled Subjects & Grade Overviews</h2>{courses.map(c => <article key={c.code} className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4"><div className="flex justify-between gap-2"><div><span className="rounded bg-amber-400 px-2 py-0.5 text-xs font-black">{c.code}</span><h3 className="mt-1 text-sm font-bold">{c.name}</h3></div><strong>Grade {c.grade}</strong></div><p className="border-t pt-2 text-xs text-slate-600">Faculty: {c.instructor}<br/>Schedule: {c.schedule}<br/>Location: {c.room}</p></article>)}</section>}
+    {tab === 'courses' && <section className="grid grid-cols-1 gap-4 rounded-2xl border border-slate-200 bg-white p-5 md:grid-cols-2"><h2 className="text-sm font-black md:col-span-2">Enrolled Subjects & Grade Overviews</h2>{courses.length === 0 && <p className="text-xs text-slate-500 md:col-span-2">No classes yet. Add them under Overview &amp; Schedule.</p>}{courses.map(c => <article key={c.id} className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4"><div className="flex justify-between gap-2"><div><span className="rounded bg-amber-400 px-2 py-0.5 text-xs font-black">{c.code}</span><h3 className="mt-1 text-sm font-bold">{c.name}</h3></div><strong>Grade {c.grade || '—'}</strong></div><p className="border-t pt-2 text-xs text-slate-600">Faculty: {c.instructor || '—'}<br/>Schedule: {c.schedule}<br/>Location: {c.room || '—'}</p></article>)}</section>}
 
     {tab === 'reviewers' && <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5"><div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div><h2 className="text-sm font-black">Saved Study Materials & Shared Reviewers</h2><p className="mt-1 text-xs text-slate-500">Browse or download sample study materials.</p></div><div className="relative"><Search size={14} className="absolute left-3 top-2.5 text-slate-400"/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search materials..." className="rounded-xl border bg-slate-50 py-2 pl-8 pr-8 text-xs"/>{query && <button onClick={() => setQuery('')} className="absolute right-2 top-2"><X size={14}/></button>}</div></div>{filteredResources.length ? filteredResources.map(r => <div key={r.id} className="flex items-center justify-between gap-3 rounded-xl border bg-slate-50 p-4"><div><span className="rounded bg-[#002147] px-2 py-0.5 text-[10px] text-white">{r.course}</span><h3 className="mt-1 text-xs font-bold">{r.title}</h3><p className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">By {r.author} · <Star size={12} className="text-amber-500"/>{r.rating} · {r.downloads} downloads</p></div><Button onClick={() => downloadResource(r)} className="flex shrink-0 items-center gap-1 bg-[#002147] text-amber-300"><Download size={14}/>Download</Button></div>) : <p className="p-6 text-center text-xs text-slate-500">No materials match “{query}”.</p>}</section>}
 
