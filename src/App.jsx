@@ -5,6 +5,7 @@ import { SignUpForm } from './components/SignUpForm';
 import { ForgotPasswordView } from './components/ForgotPasswordView';
 import { StudentDashboardPreview } from './components/StudentDashboardPreview';
 import { ReviewerCommunityView } from './components/ReviewerCommunityView';
+import { TeacherDashboard } from './components/TeacherDashboard';
 import { CampusFooter } from './components/CampusFooter';
 import {
   clearToken,
@@ -12,7 +13,7 @@ import {
   loadToken,
   logoutRequest,
   saveToken,
-} from './utils/session';
+} from './utils/Session';
 import { 
   Shield, 
   Sparkles, 
@@ -114,6 +115,8 @@ export default function App() {
     badgesEarned: ['Verified Student', 'First Upload']
   };
 
+  const isTeacher = authenticatedUser?.role === 'teacher';
+
   if (restoringSession) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#06152B] text-sm text-slate-200">
@@ -157,7 +160,7 @@ export default function App() {
                   Jose Rizal University
                 </span>
                 <span className="text-[10px] font-black uppercase tracking-wider text-blue-950 bg-amber-400 px-2 py-0.5 rounded-full shadow-sm">
-                  {currentView === 'community' ? 'Reviewer Hub' : 'Student Portal'}
+                  {isTeacher ? 'Faculty Portal' : currentView === 'community' ? 'Reviewer Hub' : 'Student Portal'}
                 </span>
               </div>
               <p className="text-[11px] hidden sm:block text-slate-300">
@@ -183,7 +186,9 @@ export default function App() {
         id="jru-main-container"
         className="w-full max-w-5xl lg:max-w-6xl mx-auto my-auto px-4 sm:px-6 py-6 sm:py-8 relative z-10 flex-1 flex flex-col justify-center"
       >
-        {authenticatedUser ? (
+        {authenticatedUser && isTeacher ? (
+          <TeacherDashboard teacher={authenticatedUser} onSignOut={handleSignOut} />
+        ) : authenticatedUser ? (
           <>
             {/* VIEW 1: Main Student Dashboard View */}
             {currentView === 'dashboard' && (
