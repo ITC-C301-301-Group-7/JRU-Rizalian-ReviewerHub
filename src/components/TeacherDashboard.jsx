@@ -2,10 +2,10 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   LayoutDashboard, FolderCog, UploadCloud, Inbox, Users, LogOut, Search, Eye, Download,
   Pencil, EyeOff, RotateCcw, Trash2, X, LoaderCircle, FileText, ChevronLeft, ChevronRight,
-  BookOpen, ShieldCheck, TrendingUp, UserPlus, AlertTriangle,
+  BookOpen, ShieldCheck, TrendingUp, UserPlus, AlertTriangle, QrCode,
 } from 'lucide-react';
 import PdfPreview from './PdfPreview';
-import { fetchBlob, saveBlob } from '../utils/authedFile';
+import { fetchBlob, saveBlob } from '../utils/Authedfile';
 import { teacherRequest, formatFileSize, formatDate } from '../utils/teacherApi';
 import { JRU_DEPARTMENTS } from '../types';
 
@@ -213,7 +213,7 @@ function OverviewPanel({ token, onGo }) {
 
 /* ---------- Manage Reviewers + Student Submissions (same table, different filters) ---------- */
 
-function ResourceManager({ token, mode, currentUserId, refreshKey }) {
+function ResourceManager({ token, mode, currentUserId, refreshKey, onOpenResource }) {
   const isSubmissions = mode === 'submissions';
   const [author, setAuthor] = useState(isSubmissions ? 'student' : 'all');
   const [status, setStatus] = useState('all');
@@ -397,6 +397,9 @@ function ResourceManager({ token, mode, currentUserId, refreshKey }) {
                         <LoaderCircle className="h-4 w-4 animate-spin text-slate-500" />
                       ) : (
                         <>
+                          {onOpenResource && (
+                            <button type="button" className={iconBtn} title="QR code, ratings and comments" aria-label="QR code, ratings and comments" onClick={() => onOpenResource(row.id)}><QrCode className="h-3.5 w-3.5" /></button>
+                          )}
                           <button type="button" className={iconBtn} title="Preview" aria-label="Preview" onClick={() => setPreview(row)}><Eye className="h-3.5 w-3.5" /></button>
                           <button type="button" className={iconBtn} title="Download" aria-label="Download" onClick={() => download(row)}><Download className="h-3.5 w-3.5" /></button>
                           <button type="button" className={iconBtn} title="Edit details" aria-label="Edit details" onClick={() => setEditing(row)}><Pencil className="h-3.5 w-3.5" /></button>
@@ -737,7 +740,7 @@ function OverviewPanelStats({ token }) {
 
 /* ---------- Dashboard shell ---------- */
 
-export function TeacherDashboard({ teacher, onSignOut }) {
+export function TeacherDashboard({ teacher, onSignOut, onOpenResource }) {
   const [tab, setTab] = useState('overview');
   const [refreshKey, setRefreshKey] = useState(0);
   const token = teacher?.token;
@@ -778,14 +781,14 @@ export function TeacherDashboard({ teacher, onSignOut }) {
 
       <div className="animate-fadeIn" key={tab}>
         {tab === 'overview' && <OverviewPanel token={token} onGo={setTab} />}
-        {tab === 'manage' && <ResourceManager token={token} mode="manage" currentUserId={teacher?.id} refreshKey={refreshKey} />}
+        {tab === 'manage' && <ResourceManager token={token} mode="manage" currentUserId={teacher?.id} refreshKey={refreshKey} onOpenResource={onOpenResource} />}
         {tab === 'upload' && (
           <UploadPanel
             token={token}
             onUploaded={() => setRefreshKey((k) => k + 1)}
           />
         )}
-        {tab === 'submissions' && <ResourceManager token={token} mode="submissions" currentUserId={teacher?.id} refreshKey={refreshKey} />}
+        {tab === 'submissions' && <ResourceManager token={token} mode="submissions" currentUserId={teacher?.id} refreshKey={refreshKey} onOpenResource={onOpenResource} />}
         {tab === 'community' && <CommunityPanel token={token} />}
       </div>
     </div>

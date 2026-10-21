@@ -6,6 +6,12 @@ import { ForgotPasswordView } from './components/ForgotPasswordView';
 import { StudentDashboardPreview } from './components/StudentDashboardPreview';
 import { ReviewerCommunityView } from './components/ReviewerCommunityView';
 import { TeacherDashboard } from './components/TeacherDashboard';
+import { FeatureNav } from './components/FeatureNav';
+import { BookmarksView } from './components/BookmarksView';
+import { DocumentTranslator } from './components/DocumentTranslator';
+import ResourceDetailModal from './components/ResourceDetailModal';
+import QrScannerModal from './components/QrScannerModal';
+import { captureIncomingResource, takePendingResource } from './utils/resourceLinks';
 import { CampusFooter } from './components/CampusFooter';
 import {
   clearToken,
@@ -36,7 +42,12 @@ import {
 export default function App() {
   const [activeTab, setActiveTab] = useState('login');
   const [authenticatedUser, setAuthenticatedUser] = useState(null);
-  const [currentView, setCurrentView] = useState('dashboard'); // 'dashboard' | 'community' | 'leaderboard'
+  const [currentView, setCurrentView] = useState('dashboard'); // 'dashboard' | 'community' | 'leaderboard' | 'bookmarks' | 'translate'
+  // Learning features shared by students and faculty
+  const [openResourceId, setOpenResourceId] = useState(null); // resource detail modal (QR links, saved list, feed)
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [translateResource, setTranslateResource] = useState(null); // resource sent to the translator
+  const [resourceVersion, setResourceVersion] = useState(0); // bumps when a rating / bookmark / comment changes
   // True while we check a saved token against the server on first load.
   const [restoringSession, setRestoringSession] = useState(() =>
     Boolean(loadToken())
@@ -63,6 +74,17 @@ export default function App() {
     return () => controller.abort();
   }, []);
 
+  // A shared QR link (?resource=12) is remembered on load and opened once the user is signed in.
+  useEffect(() => {
+    captureIncomingResource();
+  }, []);
+
+  useEffect(() => {
+    if (!authenticatedUser) return;
+    const pending = takePendingResource();
+    if (pending) setOpenResourceId(pending);
+  }, [authenticatedUser]);
+
   const handleAuthSuccess = (user, remember = true) => {
     saveToken(user.token, remember);
     setAuthenticatedUser(user);
@@ -76,6 +98,9 @@ export default function App() {
     setAuthenticatedUser(null);
     setActiveTab('login');
     setCurrentView('dashboard');
+    setOpenResourceId(null);
+    setScannerOpen(false);
+    setTranslateResource(null);
   };
 
   // Merge fields returned by the API (e.g. a new profile_photo_url) into the signed-in user.
@@ -88,6 +113,8 @@ export default function App() {
       setCurrentView('community');
     } else if (destination === 'leaderboard') {
       setCurrentView('leaderboard');
+    } else if (destination === 'bookmarks' || destination === 'translate') {
+      setCurrentView(destination);
     } else {
       setCurrentView('dashboard');
     }
@@ -116,6 +143,12 @@ export default function App() {
   };
 
   const isTeacher = authenticatedUser?.role === 'teacher';
+
+  const openTranslator = (resource) => {
+    setOpenResourceId(null);
+    setTranslateResource(resource);
+    setCurrentView('translate');
+  };
 
   if (restoringSession) {
     return (
@@ -186,12 +219,35 @@ export default function App() {
         id="jru-main-container"
         className="w-full max-w-5xl lg:max-w-6xl mx-auto my-auto px-4 sm:px-6 py-6 sm:py-8 relative z-10 flex-1 flex flex-col justify-center"
       >
-        {authenticatedUser && isTeacher ? (
-          <TeacherDashboard teacher={authenticatedUser} onSignOut={handleSignOut} />
-        ) : authenticatedUser ? (
+        {authenticatedUser ? (
           <>
+            <FeatureNav view={currentView} onChange={handleNavigate} onScan={() => setScannerOpen(true)} />
+
+            {/* Faculty home */}
+            {currentView === 'dashboard' && isTeacher && (
+              <TeacherDashboard teacher={authenticatedUser} onSignOut={handleSignOut} onOpenResource={setOpenResourceId} />
+            )}
+
+            {/* Saved reviewers */}
+            {currentView === 'bookmarks' && (
+              <BookmarksView
+                token={authenticatedUser.token}
+                onOpenResource={setOpenResourceId}
+                refreshKey={resourceVersion}
+              />
+            )}
+
+            {/* OCR + translation */}
+            {currentView === 'translate' && (
+              <DocumentTranslator
+                token={authenticatedUser.token}
+                initialResource={translateResource}
+                onInitialResourceUsed={() => setTranslateResource(null)}
+              />
+            )}
+
             {/* VIEW 1: Main Student Dashboard View */}
-            {currentView === 'dashboard' && (
+            {currentView === 'dashboard' && !isTeacher && (
               <StudentDashboardPreview
                 student={authenticatedUser}
                 onSignOut={handleSignOut}
@@ -221,6 +277,9 @@ export default function App() {
                 <ReviewerCommunityView
                   currentUser={authenticatedUser}
                   onBackToDashboard={() => setCurrentView('dashboard')}
+                  onOpenResource={setOpenResourceId}
+                  onTranslateResource={openTranslator}
+                  refreshKey={resourceVersion}
                 />
               </div>
             )}
@@ -649,6 +708,27 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* Resource features available from any screen (QR scan, shared links, saved list, feed) */}
+      {authenticatedUser && scannerOpen && (
+        <QrScannerModal
+          onClose={() => setScannerOpen(false)}
+          onResource={(id) => {
+            setScannerOpen(false);
+            setOpenResourceId(id);
+          }}
+        />
+      )}
+      {authenticatedUser && openResourceId && (
+        <ResourceDetailModal
+          resourceId={openResourceId}
+          token={authenticatedUser.token}
+          currentUser={authenticatedUser}
+          onClose={() => setOpenResourceId(null)}
+          onChanged={() => setResourceVersion((v) => v + 1)}
+          onTranslate={openTranslator}
+        />
+      )}
 
       {/* Global Campus Footer */}
       <CampusFooter />

@@ -28,11 +28,17 @@ import {
   TrendingUp,
   Trash2,
   Eye,
-  LoaderCircle
+  LoaderCircle,
+  Bookmark,
+  Languages,
+  MessageSquare
 } from 'lucide-react';
 import PdfPreview from './PdfPreview';
-import { fetchBlob, saveBlob } from '../utils/authedFile';
-import { API_URL } from '../utils/session';
+import QrShareModal from './QrShareModal';
+import QrScannerModal from './QrScannerModal';
+import { apiRequest } from '../utils/teacherApi';
+import { fetchBlob, saveBlob } from '../utils/Authedfile';
+import { API_URL } from '../utils/Session';
 
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024; // matches the backend limit (20 MB)
 const PAGE_SIZE = 12; // reviewers loaded per request
@@ -68,14 +74,18 @@ const toFeedItem = (r) => ({
   previewUrl: toAbsoluteUrl(r.previewUrl),
   downloadUrl: toAbsoluteUrl(r.downloadUrl),
   date: timeAgo(r.createdAt),
-  // Likes and ratings are not stored by the backend yet (this device only).
+  // Ratings, comments and bookmarks are stored by the backend.
+  ratingAverage: r.ratingAverage ?? null,
+  ratingCount: r.ratingCount ?? 0,
+  commentCount: r.commentCount ?? 0,
+  bookmarked: Boolean(r.bookmarked),
+  myRating: r.myRating ?? 0,
+  // Likes are not stored by the backend yet (this device only).
   likes: 0,
-  isLiked: false,
-  rating: null,
-  userRating: 0
+  isLiked: false
 });
 
-export function ReviewerCommunityView({ currentUser, onBackToDashboard }) {
+export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenResource, onTranslateResource, refreshKey }) {
   // Navigation & Filter States
   const [activeTab, setActiveTab] = useState('leaderboard'); 
   const [searchQuery, setSearchQuery] = useState('');
@@ -142,7 +152,10 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard }) {
       if (selectedCollege !== 'All') params.set('college', selectedCollege);
 
       const response = await fetch(`${API_URL}/api/resources?${params}`, {
-        headers: { Accept: 'application/json' },
+        headers: {
+          Accept: 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         signal
       });
 
@@ -160,8 +173,8 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard }) {
         const mapped = incoming.map(raw => {
           const item = toFeedItem(raw);
           const old = local.get(item.id);
-          // keep this device's like / rating state across refreshes
-          return old ? { ...item, likes: old.likes, isLiked: old.isLiked, userRating: old.userRating } : item;
+          // keep this device's like state across refreshes
+          return old ? { ...item, likes: old.likes, isLiked: old.isLiked } : item;
         });
 
         if (!append) return mapped;
@@ -185,7 +198,7 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard }) {
         setLoadingMore(false);
       }
     }
-  }, [searchQuery, selectedCollege]);
+  }, [searchQuery, selectedCollege, token]);
 
   // Reload page 1 when the filters change (waits 300 ms while the user is typing).
   useEffect(() => {
@@ -197,6 +210,17 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard }) {
       controller.abort();
     };
   }, [loadReviewers]);
+
+  // The detail modal (rating, bookmark, comment) changed something: refresh quietly.
+  const firstRefreshRef = useRef(true);
+  useEffect(() => {
+    if (firstRefreshRef.current) {
+      firstRefreshRef.current = false;
+      return;
+    }
+    loadReviewers({ silent: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshKey]);
 
   // Official Institutional Resources Data
   const officialResources = [
@@ -282,24 +306,36 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard }) {
     recognition.start();
   };
 
-  // QR Code Scanner Mock
-  const handleSimulateQrScan = () => {
-    setSearchQuery('IT 204');
+  // A scanned QR code opened a resource: hand it to the app-level detail modal.
+  const handleQrResource = (id) => {
     setIsQrScannerOpen(false);
-    setUploadSuccessMessage('QR Code Scanned! Filtering for Course: IT 204');
-    setTimeout(() => setUploadSuccessMessage(''), 4000);
+    onOpenResource?.(id);
   };
 
-  // Rating Function
-  const handleRateReviewer = (id, newRating) => {
-    setReviewersList(prev =>
-      prev.map(item => {
-        if (item.id === id) {
-          return { ...item, userRating: newRating };
-        }
-        return item;
-      })
-    );
+  // Share-by-QR modal (generate)
+  const [qrResource, setQrResource] = useState(null);
+
+  // Rating (PUT /api/resources/{id}/rating)
+  const handleRateReviewer = async (item, stars) => {
+    try {
+      const data = await apiRequest(`/resources/${item.id}/rating`, token, { method: 'PUT', body: { rating: stars } });
+      setReviewersList(prev => prev.map(r => (r.id === item.id ? { ...r, ...data } : r)));
+    } catch (err) {
+      alert(err.message || 'Could not save your rating.');
+    }
+  };
+
+  // Bookmark (PUT / DELETE /api/resources/{id}/bookmark)
+  const handleToggleBookmark = async (item) => {
+    const next = !item.bookmarked;
+    setReviewersList(prev => prev.map(r => (r.id === item.id ? { ...r, bookmarked: next } : r)));
+
+    try {
+      await apiRequest(`/resources/${item.id}/bookmark`, token, { method: next ? 'PUT' : 'DELETE' });
+    } catch (err) {
+      setReviewersList(prev => prev.map(r => (r.id === item.id ? { ...r, bookmarked: !next } : r)));
+      alert(err.message || 'Could not update your saved list.');
+    }
   };
 
   // Reporting Submission
@@ -646,20 +682,21 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard }) {
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
                       key={star}
-                      onClick={() => handleRateReviewer(item.id, star)}
+                      onClick={() => handleRateReviewer(item, star)}
+                      aria-label={`Rate ${star} star${star > 1 ? 's' : ''}`}
                       className="cursor-pointer"
                     >
                       <Star className={`w-4 h-4 ${
-                        star <= (item.userRating || item.rating || 0) 
+                        star <= (item.myRating || Math.round(item.ratingAverage || 0))
                           ? 'fill-amber-400 text-amber-400' 
                           : 'text-slate-300'
                       }`} />
                     </button>
                   ))}
                 </div>
-                {item.rating && (
-                  <span className="text-[10px] text-slate-400">({item.rating} overall)</span>
-                )}
+                <span className="text-[10px] text-slate-400">
+                  {item.ratingCount > 0 ? `${item.ratingAverage} average (${item.ratingCount})` : 'No ratings yet'}
+                </span>
               </div>
 
               <div className="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
@@ -669,6 +706,44 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard }) {
                     <ThumbsUp className={`w-3.5 h-3.5 ${item.isLiked ? 'fill-blue-900 text-blue-900' : ''}`} />
                     <span>{item.likes}</span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleBookmark(item)}
+                    title={item.bookmarked ? 'Remove from saved' : 'Save for later'}
+                    aria-label={item.bookmarked ? 'Remove from saved' : 'Save for later'}
+                    className={`p-1.5 rounded-lg cursor-pointer hover:bg-amber-50 ${item.bookmarked ? 'text-amber-500' : 'text-slate-400 hover:text-amber-500'}`}
+                  >
+                    <Bookmark className={`w-4 h-4 ${item.bookmarked ? 'fill-current' : ''}`} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onOpenResource?.(item.id)}
+                    title="Comments and details"
+                    className="flex items-center gap-1 p-1.5 text-slate-500 hover:text-blue-900 rounded-lg cursor-pointer"
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                    <span>{item.commentCount}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQrResource(item)}
+                    title="Share with QR code"
+                    aria-label="Share with QR code"
+                    className="p-1.5 text-slate-400 hover:text-blue-900 rounded-lg cursor-pointer"
+                  >
+                    <QrCode className="w-4 h-4" />
+                  </button>
+                  {onTranslateResource && (
+                    <button
+                      type="button"
+                      onClick={() => onTranslateResource(item)}
+                      title="Translate this document"
+                      aria-label="Translate this document"
+                      className="p-1.5 text-slate-400 hover:text-blue-900 rounded-lg cursor-pointer"
+                    >
+                      <Languages className="w-4 h-4" />
+                    </button>
+                  )}
                   {PREVIEWABLE_TYPES.includes(item.mimeType) && (
                     <button
                       type="button"
@@ -1186,38 +1261,13 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard }) {
         </div>
       )}
 
-      {/* MODAL 3: QR SCANNER SIMULATION MODAL */}
+      {/* MODAL 3: QR SCANNER (camera / picture / pasted link) */}
       {isQrScannerOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-sm rounded-2xl border border-slate-200 shadow-2xl overflow-hidden text-center p-6 space-y-4">
-            <div className="flex justify-between items-center">
-              <h3 className="font-black text-sm text-slate-900 flex items-center gap-2">
-                <Camera className="w-4 h-4 text-blue-950" />
-                Scan Course QR Code
-              </h3>
-              <button onClick={() => setIsQrScannerOpen(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="w-48 h-48 mx-auto bg-slate-900 rounded-2xl border-4 border-amber-400 flex items-center justify-center relative overflow-hidden">
-              <div className="absolute inset-x-0 top-1/2 h-0.5 bg-red-500 animate-pulse" />
-              <QrCode className="w-24 h-24 text-slate-700" />
-            </div>
-
-            <p className="text-xs text-slate-500">
-              Align the QR code from your course syllabus or bulletin board inside the frame.
-            </p>
-
-            <button
-              onClick={handleSimulateQrScan}
-              className="w-full py-2.5 bg-blue-950 text-amber-300 font-bold text-xs rounded-xl hover:bg-blue-900 transition-colors cursor-pointer"
-            >
-              Simulate Scanning "IT 204"
-            </button>
-          </div>
-        </div>
+        <QrScannerModal onClose={() => setIsQrScannerOpen(false)} onResource={handleQrResource} />
       )}
+
+      {/* QR CODE for sharing one reviewer */}
+      {qrResource && <QrShareModal resource={qrResource} onClose={() => setQrResource(null)} />}
 
       {/* MODAL 4: REPORT CONTENT MODAL */}
       {selectedReviewerForReport && (

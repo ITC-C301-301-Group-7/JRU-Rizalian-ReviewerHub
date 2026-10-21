@@ -43,3 +43,6 @@ export const formatDate = (iso) =>
   iso
     ? new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
     : '—';
+
+// Same helper, with a neutral name for the student-facing features.
+export { teacherRequest as apiRequest };

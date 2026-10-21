@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { X, Download, FileText, LoaderCircle } from 'lucide-react';
-import { fetchBlob, saveBlob } from '../utils/authedFile';
+import { fetchBlob, saveBlob } from '../utils/Authedfile';
 
 export default function PdfPreview({ resource, token, onClose }) {
   const [blobUrl, setBlobUrl] = useState(null);
