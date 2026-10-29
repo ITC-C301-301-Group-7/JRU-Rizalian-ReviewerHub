@@ -8,6 +8,7 @@ import {
   IdCard,
   GraduationCap,
   Briefcase,
+  KeyRound,
   Check,
   AlertCircle,
   ArrowRight,
@@ -19,7 +20,13 @@ import {
   STUDENT_YEAR_LEVELS,
   TEACHER_RANKS,
 } from '../types';
-import { formatJruId, isJruIdValid, getJruIdValidationError } from '../utils/idValidation';
+import {
+  formatJruId,
+  isJruIdValid,
+  getJruIdValidationError,
+  getJruEmailValidationError,
+} from '../utils/idValidation';
+import { API_URL } from '../utils/Session';
 
 export const SignUpForm = ({ onSuccess, onSwitchToLogin }) => {
   const [role, setRole] = useState('student');
@@ -29,6 +36,7 @@ export const SignUpForm = ({ onSuccess, onSwitchToLogin }) => {
     lastName: '',
     idNumber: '',
     email: '',
+    inviteCode: '',
     category: 'Information Technology',
     department: JRU_DEPARTMENTS[0],
     yearLevelOrRank: STUDENT_YEAR_LEVELS[0],
@@ -77,8 +85,14 @@ const handleSubmit = async (e) => {
     return;
   }
 
-  if (!formData.email.trim()) {
-    setError('Please provide your JRU email address.');
+  const emailError = getJruEmailValidationError(formData.email);
+  if (emailError) {
+    setError(emailError);
+    return;
+  }
+
+  if (role === 'teacher' && !formData.inviteCode.trim()) {
+    setError('Enter the faculty invitation code from the school administrator.');
     return;
   }
 
@@ -100,7 +114,7 @@ const handleSubmit = async (e) => {
   setIsLoading(true);
 
   try {
-    const response = await fetch('http://127.0.0.1:8000/api/register', {
+    const response = await fetch(`${API_URL}/api/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -112,6 +126,7 @@ const handleSubmit = async (e) => {
         password: formData.password,
         password_confirmation: formData.confirmPassword,
         role,
+        invite_code: role === 'teacher' ? formData.inviteCode.trim() : null,
         student_number:
           role === 'student' ? formData.idNumber.trim() : null,
         faculty_id:
@@ -324,6 +339,36 @@ const handleSubmit = async (e) => {
           </div>
         </div>
       </div>
+
+      {role === 'teacher' && (
+        <div className="space-y-1">
+          <label
+            htmlFor="signup-invite-code"
+            className="text-xs font-semibold uppercase tracking-wider text-slate-700"
+          >
+            Faculty Invitation Code
+          </label>
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 group-focus-within:text-blue-900 transition-colors">
+              <KeyRound className="w-3.5 h-3.5" />
+            </div>
+            <input
+              id="signup-invite-code"
+              name="inviteCode"
+              type="password"
+              autoComplete="off"
+              required
+              value={formData.inviteCode}
+              onChange={(e) => setFormData({ ...formData, inviteCode: e.target.value })}
+              placeholder="Provided by the school administrator"
+              className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50/70 hover:bg-white text-slate-900 placeholder:text-slate-400 border border-slate-200 rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-blue-900 focus:bg-white"
+            />
+          </div>
+          <p className="text-[10px] text-slate-500">
+            Faculty accounts are not open to the public. Ask the school administrator for this code.
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1">

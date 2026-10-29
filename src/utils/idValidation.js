@@ -26,8 +26,20 @@ export const formatJruId = (value) => {
 // Alias functions for compatibility
 export const validateStudentId = (id) => isJruIdValid(id);
 
-// Validates general email or institutional email format
+// School email domains that may register. Keep in sync with ALLOWED_EMAIL_DOMAINS in the backend .env.
+export const ALLOWED_EMAIL_DOMAINS = ['jru.edu', 'my.jru.edu', 'jru.edu.ph'];
+
+// True when the address ends with one of the school domains.
 export const validateJruEmail = (email) => {
-  const emailRegex = /^[a-zA-Z0-9._%+-]+@jru\.edu\.ph$/;
-  return emailRegex.test((email || '').trim().toLowerCase());
+  const value = (email || '').trim().toLowerCase();
+  const match = /^[a-z0-9._%+-]+@([a-z0-9.-]+)$/.exec(value);
+  return Boolean(match) && ALLOWED_EMAIL_DOMAINS.includes(match[1]);
+};
+
+export const getJruEmailValidationError = (email) => {
+  if (!email || !email.trim()) return 'Please provide your JRU email address.';
+  if (!validateJruEmail(email)) {
+    return `Please use your JRU email address (@${ALLOWED_EMAIL_DOMAINS.join(', @')}).`;
+  }
+  return '';
 };

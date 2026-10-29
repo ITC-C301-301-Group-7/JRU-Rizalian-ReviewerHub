@@ -36,6 +36,8 @@ import {
 import PdfPreview from './PdfPreview';
 import QrShareModal from './QrShareModal';
 import QrScannerModal from './QrScannerModal';
+import { TopReviewersPanel } from './TopReviewersPanel';
+import { VideoSection } from './VideoSection';
 import { apiRequest } from '../utils/teacherApi';
 import { fetchBlob, saveBlob } from '../utils/Authedfile';
 import { API_URL } from '../utils/Session';
@@ -87,7 +89,7 @@ const toFeedItem = (r) => ({
 
 export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenResource, onTranslateResource, refreshKey }) {
   // Navigation & Filter States
-  const [activeTab, setActiveTab] = useState('leaderboard'); 
+  const [activeTab, setActiveTab] = useState('feed'); // opens on the Peer Reviewers Feed 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCollege, setSelectedCollege] = useState('All');
   
@@ -570,10 +572,20 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
           <Trophy className="w-4 h-4 text-amber-500" />
           <span>Leaderboard</span>
         </button>
+
+        <button
+          onClick={() => setActiveTab('topReviewers')}
+          className={`pb-3 px-4 text-xs font-bold transition-colors cursor-pointer border-b-2 flex items-center gap-2 shrink-0 ${
+            activeTab === 'topReviewers' ? 'border-[#002147] text-[#002147]' : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <Star className="w-4 h-4 text-amber-500" />
+          <span>Top Reviewers</span>
+        </button>
       </div>
 
       {/* SEARCH BAR (FOR FEED & OFFICIAL) */}
-      {activeTab !== 'leaderboard' && (
+      {activeTab !== 'leaderboard' && activeTab !== 'topReviewers' && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <div className="relative flex-1 flex items-center gap-2">
             <div className="relative flex-1">
@@ -627,6 +639,14 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
       {/* TAB 1: PEER REVIEWERS FEED */}
       {activeTab === 'feed' && (
         <div className="space-y-3">
+          {/* Video reviewers (YouTube / Vimeo links) follow the same search and college filter */}
+          <VideoSection token={token} search={searchQuery} college={selectedCollege} refreshKey={refreshKey} />
+
+          <div className="flex items-center gap-2 pt-3">
+            <BookOpen className="w-4 h-4 text-[#002147]" />
+            <h2 className="text-sm font-black text-slate-900">Reviewer Files</h2>
+          </div>
+
           {feedLoading && (
             <div className="flex items-center justify-center gap-2 p-8 text-xs text-slate-500">
               <LoaderCircle className="w-4 h-4 animate-spin" />
@@ -649,17 +669,19 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
             </div>
           )}
 
-          {!feedLoading && filteredReviewers.map((item) => (
-            <div key={item.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
-              <div className="flex items-start justify-between gap-4">
-                <div>
+          {!feedLoading && filteredReviewers.length > 0 && (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {filteredReviewers.map((item) => (
+            <div key={item.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3 h-full flex flex-col">
+              <div className="flex flex-1 items-start justify-between gap-3">
+                <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] font-black bg-blue-950 text-amber-300 px-2 py-0.5 rounded">
                       {item.courseCode}
                     </span>
-                    <span className="text-[10px] font-bold text-slate-500">{item.college}</span>
+                    <span className="text-[10px] font-bold text-slate-500 truncate">{item.college}</span>
                   </div>
-                  <h3 className="text-sm font-extrabold text-slate-900 mt-1">{item.title}</h3>
+                  <h3 className="text-sm font-extrabold text-slate-900 mt-1 line-clamp-2 break-words">{item.title}</h3>
                   {item.description && (
                     <p className="text-xs text-slate-600 mt-1 line-clamp-2">{item.description}</p>
                   )}
@@ -676,7 +698,7 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-lg text-xs">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 bg-slate-50 p-2 rounded-lg text-xs">
                 <span className="text-[11px] font-bold text-slate-600">Rate Usefulness:</span>
                 <div className="flex items-center gap-1">
                   {[1, 2, 3, 4, 5].map((star) => (
@@ -699,9 +721,9 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
                 </span>
               </div>
 
-              <div className="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
-                <span>By <strong>{item.author}</strong> &bull; {item.date}</span>
-                <div className="flex items-center gap-3">
+              <div className="flex flex-col gap-2 text-xs text-slate-500 pt-2 border-t border-slate-100">
+                <span className="truncate">By <strong>{item.author}</strong> &bull; {item.date}</span>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
                   <button onClick={() => handleLikeReviewer(item.id)} className="flex items-center gap-1 hover:text-blue-900 cursor-pointer">
                     <ThumbsUp className={`w-3.5 h-3.5 ${item.isLiked ? 'fill-blue-900 text-blue-900' : ''}`} />
                     <span>{item.likes}</span>
@@ -782,6 +804,8 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
               </div>
             </div>
           ))}
+          </div>
+          )}
 
           {!feedLoading && !feedError && reviewersList.length > 0 && (
             <div className="flex flex-col items-center gap-2 pt-2">
@@ -841,6 +865,11 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
             ))}
           </div>
         </div>
+      )}
+
+      {/* TAB 4: TOP REVIEWERS (ranked by rating, reviews, or saves) */}
+      {activeTab === 'topReviewers' && (
+        <TopReviewersPanel token={token} onOpenResource={onOpenResource} refreshKey={refreshKey} />
       )}
 
       {/* TAB 3: LEADERBOARD WITH "HOW TO EARN POINTS" */}

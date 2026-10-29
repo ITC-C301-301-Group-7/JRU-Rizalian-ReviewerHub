@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 
 import PdfPreview from "../components/PdfPreview";
-import { fetchBlob, saveBlob } from "../utils/authedFile";
+import { fetchBlob, saveBlob } from "../utils/Authedfile";
 
 const API_URL = (
     import.meta.env.VITE_API_URL || "http://127.0.0.1:8000"

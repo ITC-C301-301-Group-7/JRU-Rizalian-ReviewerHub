@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Mail, ArrowLeft, CheckCircle2, LifeBuoy, Check } from 'lucide-react';
 import { formatJruId, isJruIdValid, getJruIdValidationError } from '../utils/idValidation';
+import { API_URL } from '../utils/Session';
 
 export const ForgotPasswordView = ({ onBackToLogin }) => {
   const [emailOrId, setEmailOrId] = useState('');
@@ -16,12 +17,12 @@ export const ForgotPasswordView = ({ onBackToLogin }) => {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
     const clean = emailOrId.trim();
     if (!clean) {
-      setError('Please enter your Student ID or JRU Email.');
+      setError('Please enter your Student ID, Faculty ID or JRU Email.');
       return;
     }
     if (!clean.includes('@')) {
@@ -32,10 +33,28 @@ export const ForgotPasswordView = ({ onBackToLogin }) => {
       }
     }
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      const response = await fetch(`${API_URL}/api/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ identifier: clean }),
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (response.status === 429) {
+        throw new Error('Too many requests. Please wait a minute and try again.');
+      }
+      if (!response.ok) {
+        throw new Error(
+          data.errors ? Object.values(data.errors).flat().join(' ') : data.message || 'Could not send the reset link.'
+        );
+      }
       setIsSubmitted(true);
-    }, 600);
+    } catch (err) {
+      setError(err.message || 'Unable to connect to the server.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -67,13 +86,13 @@ export const ForgotPasswordView = ({ onBackToLogin }) => {
             <CheckCircle2 className="w-6 h-6" />
           </div>
           <div className="space-y-1">
-            <h3 className="text-sm font-bold text-blue-950">Password Reset Link Sent</h3>
+            <h3 className="text-sm font-bold text-blue-950">Check your inbox</h3>
             <p className="text-xs text-slate-600">
-              We sent password recovery instructions to the registered inbox for <strong>{emailOrId}</strong>.
+              If an account matches <strong>{emailOrId}</strong>, we sent a password reset link to its email address. The link works for 60 minutes.
             </p>
           </div>
           <div className="text-[11px] text-slate-500 bg-white/80 p-2.5 rounded-xl border border-slate-200">
-            Please check your <strong>@my.jru.edu</strong> Google Workspace inbox or spam folder. If you still cannot log in, contact the JRU I.T. Helpdesk.
+            Please check your school email inbox or spam folder. If you still cannot log in, contact the JRU I.T. Helpdesk.
           </div>
           <button
             type="button"
@@ -98,7 +117,7 @@ export const ForgotPasswordView = ({ onBackToLogin }) => {
                 htmlFor="reset-email"
                 className="text-xs font-semibold uppercase tracking-wider text-slate-700"
               >
-                Student Number or JRU Email
+                Student ID, Faculty ID or JRU Email
               </label>
               <span className="text-[10px] text-amber-800 font-semibold font-mono bg-yellow-100 px-1.5 py-0.5 rounded-sm border border-yellow-300">
                 e.g. 25-260000 (Example)

@@ -3,6 +3,8 @@ import { JruLogo } from './components/JruLogo';
 import { LoginForm } from './components/LoginForm';
 import { SignUpForm } from './components/SignUpForm';
 import { ForgotPasswordView } from './components/ForgotPasswordView';
+import { ResetPasswordView } from './components/ResetPasswordView';
+import { takeResetLink } from './utils/resetLink';
 import { StudentDashboardPreview } from './components/StudentDashboardPreview';
 import { ReviewerCommunityView } from './components/ReviewerCommunityView';
 import { TeacherDashboard } from './components/TeacherDashboard';
@@ -39,10 +41,15 @@ import {
   Search
 } from 'lucide-react';
 
+// Read once when the page loads (module scope, so React StrictMode cannot run it twice).
+const INITIAL_RESET_LINK = takeResetLink();
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState('login');
+  const [resetLink] = useState(INITIAL_RESET_LINK);
+  const [activeTab, setActiveTab] = useState(INITIAL_RESET_LINK ? 'reset' : 'login');
   const [authenticatedUser, setAuthenticatedUser] = useState(null);
   const [currentView, setCurrentView] = useState('dashboard'); // 'dashboard' | 'community' | 'leaderboard' | 'bookmarks' | 'translate'
+  const [dashboardHome, setDashboardHome] = useState(0); // bumps when "Dashboard" is clicked so the dashboard returns to its Overview tab
   // Learning features shared by students and faculty
   const [openResourceId, setOpenResourceId] = useState(null); // resource detail modal (QR links, saved list, feed)
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -117,6 +124,7 @@ export default function App() {
       setCurrentView(destination);
     } else {
       setCurrentView('dashboard');
+      setDashboardHome((n) => n + 1);
     }
   };
 
@@ -182,9 +190,18 @@ export default function App() {
         className="w-full bg-[#002147] text-white border-b border-amber-400/40 shadow-md relative z-20"
       >
         <div className="max-w-5xl lg:max-w-6xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
-          <div 
+          <div
             className="flex items-center gap-3 cursor-pointer"
-            onClick={() => authenticatedUser && setCurrentView('dashboard')}
+            role={authenticatedUser ? 'button' : undefined}
+            tabIndex={authenticatedUser ? 0 : undefined}
+            aria-label={authenticatedUser ? 'Go to dashboard' : undefined}
+            onClick={() => authenticatedUser && handleNavigate('dashboard')}
+            onKeyDown={(e) => {
+              if (authenticatedUser && (e.key === 'Enter' || e.key === ' ')) {
+                e.preventDefault();
+                handleNavigate('dashboard');
+              }
+            }}
           >
             <JruLogo size="sm" className="w-10 h-10" />
             <div>
@@ -254,6 +271,9 @@ export default function App() {
                 onBack={handleSignOut}
                 onNavigate={handleNavigate}
                 onUserUpdated={handleUserUpdated}
+                onOpenResource={setOpenResourceId}
+                refreshKey={resourceVersion}
+                homeSignal={dashboardHome}
               />
             )}
 
@@ -691,6 +711,14 @@ export default function App() {
 
                 {activeTab === 'forgot' && (
                   <ForgotPasswordView
+                    onBackToLogin={() => setActiveTab('login')}
+                  />
+                )}
+
+                {activeTab === 'reset' && resetLink && (
+                  <ResetPasswordView
+                    token={resetLink.token}
+                    email={resetLink.email}
                     onBackToLogin={() => setActiveTab('login')}
                   />
                 )}

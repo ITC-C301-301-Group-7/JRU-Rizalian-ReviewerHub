@@ -187,6 +187,14 @@ export function DocumentTranslator({ token, initialResource, onInitialResourceUs
         <p className="mt-1 text-xs text-slate-500">
           Upload a PDF, Word, PowerPoint, or image. Text is read from the file (with OCR for scans and photos), then translated into your language.
         </p>
+        <p className="mt-2 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-[11px] text-amber-900">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            <strong>Privacy:</strong> reading the file happens on your device, but the text is sent through our server to an
+            outside translation service (MyMemory or LibreTranslate) to be translated. Don’t translate documents that contain
+            personal data, grades, IDs or other private information.
+          </span>
+        </p>
       </div>
 
       {/* Step 1 */}
