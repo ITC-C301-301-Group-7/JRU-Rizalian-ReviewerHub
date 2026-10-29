@@ -47,6 +47,16 @@ const PAGE_SIZE = 12; // reviewers loaded per request
 const ALLOWED_EXTENSIONS = ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'jpg', 'jpeg', 'png', 'webp'];
 const PREVIEWABLE_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
 
+// The timeframe buttons use these ids; the API calls the last one "all".
+const LEADERBOARD_PERIODS = { month: 'month', semester: 'semester', allTime: 'all' };
+const LEADERBOARD_LIMIT = 20;
+
+const badgeFor = (row) =>
+  row.rank === 1 ? 'Top Contributor'
+    : row.fiveStarRatings >= 5 ? 'Quality Scholar'
+      : row.contributions >= 5 ? 'Active Contributor'
+        : 'Rising Contributor';
+
 const toAbsoluteUrl = (url) =>
   !url ? '' : url.startsWith('http') ? url : `${API_URL}${url}`;
 
@@ -119,13 +129,8 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
     file: null
   });
 
-  // User Stats State
-  const [userStats, setUserStats] = useState({
-    rank: 14,
-    points: currentUser?.points || 450,
-    contributions: 5,
-    badgesEarned: ['Verified Student', 'Resource Contributor']
-  });
+  // The signed-in student's all-time points (filled from GET /api/leaderboard).
+  const [userStats, setUserStats] = useState({ points: 0, contributions: 0 });
 
   // Community Feed Data (loaded from the Laravel API)
   const token = currentUser?.token;
@@ -258,16 +263,59 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
     }
   ];
 
-  // Leaderboard Data
-  const [leaderboardData, setLeaderboardData] = useState([
-    { rank: 1, name: 'Maria Santos', college: 'College of Business Administration', program: 'BSBA - Financial Management', points: 1420, contributions: 28, downloads: 1240, badge: 'Top Contributor' },
-    { rank: 2, name: 'Jann Dela Cruz', college: 'College of Computer Studies', program: 'BS Information Technology', points: 1250, contributions: 22, downloads: 980, badge: 'Top Quizmaster' },
-    { rank: 3, name: 'Rhea Alonzo', college: 'College of Nursing & Health Sciences', program: 'BS Nursing', points: 1180, contributions: 19, downloads: 850, badge: 'Verified Scholar' },
-    { rank: 4, name: 'Mark Anthony Reyes', college: 'College of Engineering & Tech', program: 'BS Computer Engineering', points: 980, contributions: 16, downloads: 620, badge: 'Peer Tutor' },
-    { rank: 5, name: 'Camille Villar', college: 'College of Liberal Arts & Education', program: 'BA Communication', points: 890, contributions: 14, downloads: 510, badge: 'Resource Hero' },
-    { rank: 6, name: 'Joshua Lim', college: 'College of Computer Studies', program: 'BS Computer Science', points: 760, contributions: 11, downloads: 430, badge: 'Code Navigator' },
-    { rank: 7, name: 'Patricia Gomez', college: 'College of Business Administration', program: 'BSBA - Marketing', points: 640, contributions: 9, downloads: 380, badge: 'Note Master' }
-  ]);
+  // Leaderboard (loaded from the Laravel API; follows the This Month / This Semester / All-Time buttons)
+  const [leaderboard, setLeaderboard] = useState({
+    items: [],
+    loading: true,
+    error: '',
+    label: '',
+    total: 0,
+    me: { rank: null, points: 0, contributions: 0 },
+    rules: { upload: 50, fiveStar: 10 }
+  });
+  const leaderboardRequestRef = useRef(0); // lets a newer request replace an older one
+  // Hide the previous period's rows while the next one loads.
+  const leaderboardData = leaderboard.loading ? [] : leaderboard.items;
+
+  const loadLeaderboard = useCallback(async ({ silent = false, signal } = {}) => {
+    const requestId = ++leaderboardRequestRef.current;
+    if (!silent) setLeaderboard(prev => ({ ...prev, loading: true, error: '' }));
+
+    try {
+      const period = LEADERBOARD_PERIODS[leaderboardTimeframe] || 'month';
+      const data = await apiRequest(`/leaderboard?period=${period}&limit=${LEADERBOARD_LIMIT}`, token, { signal });
+      if (requestId !== leaderboardRequestRef.current) return;
+
+      setLeaderboard({
+        items: (Array.isArray(data.data) ? data.data : []).map(row => ({
+          ...row,
+          program: row.program || row.college || 'JRU Student',
+          badge: badgeFor(row)
+        })),
+        loading: false,
+        error: '',
+        label: data.label || '',
+        total: data.total ?? 0,
+        me: data.me || { rank: null, points: 0, contributions: 0 },
+        rules: data.rules || { upload: 50, fiveStar: 10 }
+      });
+      setUserStats({
+        points: data.allTime?.points ?? 0,
+        contributions: data.allTime?.contributions ?? 0
+      });
+    } catch (err) {
+      if (err.name === 'AbortError' || requestId !== leaderboardRequestRef.current) return;
+      setLeaderboard(prev => ({ ...prev, items: [], loading: false, error: err.message || 'Unable to load the leaderboard.' }));
+    }
+  }, [token, leaderboardTimeframe]);
+
+  // Load again when the timeframe changes, or when a rating / upload elsewhere bumps refreshKey.
+  useEffect(() => {
+    const controller = new AbortController();
+    loadLeaderboard({ signal: controller.signal });
+
+    return () => controller.abort();
+  }, [loadLeaderboard, refreshKey]);
 
   // Point Earning Rules Data
   const pointEarningRules = [
@@ -427,11 +475,7 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
       }
 
       await loadReviewers({ silent: true });
-      setUserStats(stats => ({
-        ...stats,
-        points: stats.points + 50,
-        contributions: stats.contributions + 1
-      }));
+      loadLeaderboard({ silent: true }); // points are worked out by the server
 
       setUploadForm({ title: '', courseCode: '', college: 'College of Business Administration', description: '', file: null });
       setIsUploadModalOpen(false);
@@ -899,6 +943,8 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
 
               <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-bold">
                 <button
+                  type="button"
+                  aria-pressed={leaderboardTimeframe === 'month'}
                   onClick={() => setLeaderboardTimeframe('month')}
                   className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                     leaderboardTimeframe === 'month' ? 'bg-white text-blue-950 shadow-sm' : 'text-slate-500 hover:text-slate-800'
@@ -907,6 +953,8 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
                   This Month
                 </button>
                 <button
+                  type="button"
+                  aria-pressed={leaderboardTimeframe === 'semester'}
                   onClick={() => setLeaderboardTimeframe('semester')}
                   className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                     leaderboardTimeframe === 'semester' ? 'bg-white text-blue-950 shadow-sm' : 'text-slate-500 hover:text-slate-800'
@@ -915,6 +963,8 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
                   This Semester
                 </button>
                 <button
+                  type="button"
+                  aria-pressed={leaderboardTimeframe === 'allTime'}
                   onClick={() => setLeaderboardTimeframe('allTime')}
                   className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                     leaderboardTimeframe === 'allTime' ? 'bg-white text-blue-950 shadow-sm' : 'text-slate-500 hover:text-slate-800'
@@ -925,6 +975,35 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
               </div>
             </div>
           </div>
+
+          {/* Which period is shown, and how the points are counted */}
+          <div className="flex flex-col gap-1 text-[11px] text-slate-500 sm:flex-row sm:items-center sm:justify-between" aria-live="polite">
+            <span>
+              Showing: <strong className="text-slate-700">{leaderboard.label || '...'}</strong>
+              {!leaderboard.loading && leaderboard.total > 0 && ` · ${leaderboard.total} ranked`}
+            </span>
+            <span>{leaderboard.rules.upload} pts per approved upload · {leaderboard.rules.fiveStar} pts per 5-star rating received</span>
+          </div>
+
+          {leaderboard.loading && (
+            <div className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white p-8 text-xs text-slate-500">
+              <LoaderCircle className="w-4 h-4 animate-spin" />
+              <span>Loading leaderboard...</span>
+            </div>
+          )}
+
+          {!leaderboard.loading && leaderboard.error && (
+            <div role="alert" className="bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl p-4 flex items-center justify-between gap-3">
+              <span>{leaderboard.error}</span>
+              <button type="button" onClick={() => loadLeaderboard()} className="font-bold underline cursor-pointer">Retry</button>
+            </div>
+          )}
+
+          {!leaderboard.loading && !leaderboard.error && leaderboardData.length === 0 && (
+            <div className="bg-white p-8 rounded-2xl border border-dashed border-slate-300 text-center text-xs text-slate-500">
+              No one has earned points for this period yet. Upload a reviewer or get 5-star ratings to take the first spot!
+            </div>
+          )}
 
           {/* QUICK HOW-TO EARN POINTS CAROUSEL / HIGHLIGHT BOX */}
           <div className="bg-gradient-to-r from-amber-500/10 via-amber-400/5 to-blue-900/5 border border-amber-300/60 p-4 rounded-2xl">
@@ -1065,6 +1144,7 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
           </div>
 
           {/* Leaderboard Ranks Table (Ranks 4+) */}
+          {leaderboardData.length > 3 && (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-4 bg-slate-50 border-b border-slate-200 font-extrabold text-xs text-slate-700 uppercase tracking-wider">
               Runner-Up Leaderboard Standings
@@ -1098,25 +1178,26 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
               ))}
             </div>
           </div>
+          )}
 
           {/* Logged in User Current Rank Floating Bar */}
           <div className="bg-[#002147] text-white p-4 rounded-2xl border border-amber-400/40 shadow-lg flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-amber-400 text-blue-950 font-black flex items-center justify-center text-sm shadow">
-                #{userStats.rank}
+                {leaderboard.me.rank ? `#${leaderboard.me.rank}` : '—'}
               </div>
               <div>
-                <span className="text-[10px] uppercase font-bold text-amber-300 block">Your Current Rank</span>
+                <span className="text-[10px] uppercase font-bold text-amber-300 block">Your Rank{leaderboard.label ? ` · ${leaderboard.label}` : ''}</span>
                 <h5 className="font-bold text-sm text-white">{currentUser?.name || 'Rizalian Student'}</h5>
               </div>
             </div>
 
             <div className="flex items-center gap-4 text-right">
               <div>
-                <span className="text-[10px] uppercase font-bold text-slate-300 block">Your Total Points</span>
+                <span className="text-[10px] uppercase font-bold text-slate-300 block">Your Points</span>
                 <span className="text-sm font-black text-amber-400 flex items-center justify-end gap-1">
                   <Zap className="w-4 h-4 fill-amber-400 text-amber-400" />
-                  {userStats.points} Pts
+                  {leaderboard.me.points} Pts
                 </span>
               </div>
             </div>
