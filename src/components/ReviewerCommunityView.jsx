@@ -92,9 +92,9 @@ const toFeedItem = (r) => ({
   commentCount: r.commentCount ?? 0,
   bookmarked: Boolean(r.bookmarked),
   myRating: r.myRating ?? 0,
-  // Likes are not stored by the backend yet (this device only).
-  likes: 0,
-  isLiked: false
+  // Likes are stored by the backend (PUT / DELETE /api/resources/{id}/like).
+  likes: r.likeCount ?? 0,
+  isLiked: Boolean(r.liked)
 });
 
 export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenResource, onTranslateResource, refreshKey }) {
@@ -176,12 +176,8 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
       const incoming = Array.isArray(data.data) ? data.data : [];
 
       setReviewersList(prev => {
-        const local = new Map(prev.map(item => [item.id, item]));
         const mapped = incoming.map(raw => {
-          const item = toFeedItem(raw);
-          const old = local.get(item.id);
-          // keep this device's like state across refreshes
-          return old ? { ...item, likes: old.likes, isLiked: old.isLiked } : item;
+          return toFeedItem(raw);
         });
 
         if (!append) return mapped;
@@ -331,10 +327,15 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
   // Share-by-QR modal (generate)
   const [qrResource, setQrResource] = useState(null);
 
-  // Rating (PUT /api/resources/{id}/rating)
+  // Rating (PUT /api/resources/{id}/rating); clicking your current star removes it (DELETE)
   const handleRateReviewer = async (item, stars) => {
     try {
-      const data = await apiRequest(`/resources/${item.id}/rating`, token, { method: 'PUT', body: { rating: stars } });
+      const removing = stars === item.myRating;
+      const data = await apiRequest(
+        `/resources/${item.id}/rating`,
+        token,
+        removing ? { method: 'DELETE' } : { method: 'PUT', body: { rating: stars } }
+      );
       setReviewersList(prev => prev.map(r => (r.id === item.id ? { ...r, ...data } : r)));
     } catch (err) {
       alert(err.message || 'Could not save your rating.');
@@ -363,10 +364,23 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
   };
 
   // Like Function
-  const handleLikeReviewer = (id) => {
-    setReviewersList(prev =>
-      prev.map(item => item.id === id ? { ...item, likes: item.isLiked ? item.likes - 1 : item.likes + 1, isLiked: !item.isLiked } : item)
-    );
+  const handleLikeReviewer = async (id) => {
+    const target = reviewersList.find(item => item.id === id);
+    if (!target) return;
+
+    const next = !target.isLiked;
+    const apply = (liked, likes) =>
+      setReviewersList(prev => prev.map(item => (item.id === id ? { ...item, isLiked: liked, likes } : item)));
+
+    apply(next, Math.max(0, target.likes + (next ? 1 : -1))); // show it right away
+
+    try {
+      const data = await apiRequest(`/resources/${id}/like`, token, { method: next ? 'PUT' : 'DELETE' });
+      apply(Boolean(data.liked), data.likeCount ?? 0);
+    } catch (err) {
+      apply(target.isLiked, target.likes); // put it back
+      alert(err.message || 'Could not update your like.');
+    }
   };
 
   // File picker: validate type and size before uploading
@@ -638,9 +652,16 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
               className="bg-slate-100 text-xs font-medium px-3 py-2 rounded-xl border border-slate-200 focus:outline-none"
             >
               <option value="All">All Colleges</option>
+              {/* The value is a keyword matched inside the stored college name, so it covers the
+                  student upload names (e.g. "...Engineering & Tech") and the faculty names (e.g. "...Engineering & Technology"). */}
               <option value="Business">Business Administration</option>
               <option value="Computer">Computer Studies</option>
               <option value="Nursing">Nursing &amp; Health</option>
+              <option value="Engineering">Engineering &amp; Technology</option>
+              <option value="Arts">Arts, Sciences &amp; Education</option>
+              <option value="Hospitality">Hospitality &amp; Tourism</option>
+              <option value="Senior High">Senior High School</option>
+              <option value="Graduate">Graduate School</option>
             </select>
           </div>
         </div>
@@ -715,7 +736,8 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
                     <button
                       key={star}
                       onClick={() => handleRateReviewer(item, star)}
-                      aria-label={`Rate ${star} star${star > 1 ? 's' : ''}`}
+                      aria-label={star === item.myRating ? `Remove your ${star} star rating` : `Rate ${star} star${star > 1 ? 's' : ''}`}
+                      title={star === item.myRating ? 'Click again to remove your rating' : undefined}
                       className="cursor-pointer"
                     >
                       <Star className={`w-4 h-4 ${

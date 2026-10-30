@@ -83,9 +83,15 @@ export default function ResourceDetailModal({ resourceId, token, currentUser, on
       onChanged?.();
     });
 
+  // Clicking the star you already picked takes your rating back.
   const rate = (stars) =>
     run(async () => {
-      const data = await apiRequest(`/resources/${resource.id}/rating`, token, { method: 'PUT', body: { rating: stars } });
+      const removing = stars === resource.myRating;
+      const data = await apiRequest(
+        `/resources/${resource.id}/rating`,
+        token,
+        removing ? { method: 'DELETE' } : { method: 'PUT', body: { rating: stars } }
+      );
       setResource((r) => ({ ...r, ...data }));
       onChanged?.();
     });
@@ -167,7 +173,8 @@ export default function ResourceDetailModal({ resourceId, token, currentUser, on
                       type="button"
                       disabled={busy || isOwner}
                       onClick={() => rate(star)}
-                      aria-label={`Rate ${star} star${star > 1 ? 's' : ''}`}
+                      aria-label={star === resource.myRating ? `Remove your ${star} star rating` : `Rate ${star} star${star > 1 ? 's' : ''}`}
+                      title={star === resource.myRating ? 'Click again to remove your rating' : undefined}
                       className="cursor-pointer disabled:cursor-not-allowed"
                     >
                       <Star className={`h-5 w-5 ${star <= shownStars ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />

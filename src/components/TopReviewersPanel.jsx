@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Bookmark, LoaderCircle, MessageSquare, Star, Trophy } from 'lucide-react';
+import { Bookmark, LoaderCircle, MessageSquare, Star, ThumbsUp, Trophy } from 'lucide-react';
 import { apiRequest } from '../utils/teacherApi';
 import { ReviewerRow } from './StudyReviewersPanel';
 
@@ -20,6 +20,14 @@ const SORTS = [
     hint: 'Reviewers with the most ratings and comments combined.',
     empty: 'Nothing has been rated or commented on yet.',
     metric: (r) => `${r.ratingCount + r.commentCount} reviews (${r.ratingCount} rating${r.ratingCount === 1 ? '' : 's'}, ${r.commentCount} comment${r.commentCount === 1 ? '' : 's'})`,
+  },
+  {
+    id: 'liked',
+    label: 'Most Liked',
+    icon: ThumbsUp,
+    hint: 'Reviewers that students liked the most.',
+    empty: 'Nobody has liked a reviewer yet. Press the like button on a reviewer in the community.',
+    metric: (r) => `${r.likeCount} like${r.likeCount === 1 ? '' : 's'}`,
   },
   {
     id: 'saved',

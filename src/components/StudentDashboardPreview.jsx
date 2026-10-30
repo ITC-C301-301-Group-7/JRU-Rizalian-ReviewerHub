@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { SchedulePanel, useSchedule } from './SchedulePanel';
 import { API_URL } from '../utils/Session';
+import { apiRequest } from '../utils/teacherApi';
 import { StudyReviewersPanel } from './StudyReviewersPanel';
 import { TopReviewersPanel } from './TopReviewersPanel';
 import {
@@ -27,6 +28,17 @@ export function StudentDashboardPreview({ student, onSignOut, onNavigate, onUser
   // Clicking "Dashboard" in the top navigation (or the logo) returns to the Overview tab.
   useEffect(() => { setTab('overview'); }, [homeSignal]);
   const schedule = useSchedule(student?.token); // saved class schedule (add / edit / delete)
+
+  // Honor Points = the student's real all-time contribution points from the leaderboard API.
+  const [honorPoints, setHonorPoints] = useState(null); // null while loading or if it could not be loaded
+  useEffect(() => {
+    if (!student?.token) return undefined;
+    const controller = new AbortController();
+    apiRequest('/leaderboard?period=all&limit=1', student.token, { signal: controller.signal })
+      .then((data) => setHonorPoints(data?.allTime?.points ?? 0))
+      .catch((err) => { if (err.name !== 'AbortError') setHonorPoints(null); });
+    return () => controller.abort();
+  }, [student?.token, refreshKey]);
   const courses = schedule.courses;
   const [uploading, setUploading] = useState(false);
   const [photoError, setPhotoError] = useState('');
@@ -114,7 +126,7 @@ export function StudentDashboardPreview({ student, onSignOut, onNavigate, onUser
         [GraduationCap, 'Cumulative GPA', student?.gpa || 'Not available', 'bg-blue-50 text-blue-900'],
         [BookOpen, 'Enrolled Courses', `${courses.length} Subjects`, 'bg-amber-50 text-amber-700'],
         [CheckCircle, 'Academic Status', 'Good Standing', 'bg-emerald-50 text-emerald-700'],
-        [Trophy, 'Honor Points', '450 Pts', 'bg-purple-50 text-purple-700'],
+        [Trophy, 'Honor Points', honorPoints === null ? '—' : `${honorPoints} Pts`, 'bg-purple-50 text-purple-700'],
       ].map(([Icon, label, value, color]) => <div key={label} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${color}`}><Icon size={20}/></div><div><p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{label}</p><p className="text-sm font-black text-slate-900">{value}</p></div></div>)}
     </section>
 

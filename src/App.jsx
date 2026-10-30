@@ -7,6 +7,7 @@ import { ResetPasswordView } from './components/ResetPasswordView';
 import { takeResetLink } from './utils/resetLink';
 import { StudentDashboardPreview } from './components/StudentDashboardPreview';
 import { ReviewerCommunityView } from './components/ReviewerCommunityView';
+import { HonorRollView } from './components/HonorRollView';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { FeatureNav } from './components/FeatureNav';
 import { BookmarksView } from './components/BookmarksView';
@@ -23,23 +24,12 @@ import {
   logoutRequest,
   saveToken,
 } from './utils/Session';
-import { 
-  Shield, 
-  Sparkles, 
-  GraduationCap, 
-  BookOpen, 
-  CheckCircle2, 
-  ArrowLeft, 
-  Trophy, 
-  Medal, 
-  Award, 
-  Star, 
-  TrendingUp, 
-  UploadCloud, 
-  UserCheck, 
-  Zap,
-  CheckCircle,
-  Search
+import {
+  Shield,
+  GraduationCap,
+  BookOpen,
+  CheckCircle2,
+  ArrowLeft,
 } from 'lucide-react';
 
 // Read once when the page loads (module scope, so React StrictMode cannot run it twice).
@@ -129,28 +119,6 @@ export default function App() {
       setCurrentView('dashboard');
       setDashboardHome((n) => n + 1);
     }
-  };
-
-  // Sample leaderboard data across university colleges
-  const leaderboardData = [
-    { rank: 1, name: 'Maria Santos', college: 'College of Business Administration', program: 'BSBA - Financial Management', points: 1420, contributions: 28, badge: 'Top Contributor', avatarColor: 'bg-amber-400 text-[#002147]' },
-    { rank: 2, name: 'Jann Dela Cruz', college: 'College of Computer Studies', program: 'BS Information Technology', points: 1250, contributions: 22, badge: 'Quizmaster', avatarColor: 'bg-slate-300 text-[#002147]' },
-    { rank: 3, name: 'Rhea Alonzo', college: 'College of Nursing & Health Sciences', program: 'BS Nursing', points: 1180, contributions: 19, badge: 'Verified Scholar', avatarColor: 'bg-amber-700 text-white' },
-    { rank: 4, name: 'Mark Anthony Reyes', college: 'College of Engineering & Tech', program: 'BS Computer Engineering', points: 980, contributions: 16, badge: 'Peer Tutor', avatarColor: 'bg-blue-100 text-blue-900' },
-    { rank: 5, name: 'Camille Villar', college: 'College of Liberal Arts & Education', program: 'BA Communication', points: 890, contributions: 14, badge: 'Resource Hero', avatarColor: 'bg-[#002147] text-white' },
-    { rank: 6, name: 'Paul Jebulan', college: 'College of Business Administration', program: 'BS Accountancy', points: 840, contributions: 12, badge: 'Active Contributor', avatarColor: 'bg-[#002147] text-white' },
-    { rank: 7, name: 'Sofia Nicole Garcia', college: 'College of Computer Studies', program: 'BS Computer Science', points: 790, contributions: 11, badge: 'Active Contributor', avatarColor: 'bg-[#002147] text-white' },
-    { rank: 8, name: 'Gabriel Mendoza', college: 'College of Hospitality Management', program: 'BS Hospitality Management', points: 720, contributions: 9, badge: 'Active Contributor', avatarColor: 'bg-[#002147] text-white' },
-    { rank: 9, name: 'Angela Bautista', college: 'College of Nursing & Health Sciences', program: 'BS Nursing', points: 680, contributions: 8, badge: 'Active Contributor', avatarColor: 'bg-[#002147] text-white' },
-    { rank: 10, name: 'Kevin Joshua Tan', college: 'College of Engineering & Tech', program: 'BS Industrial Engineering', points: 640, contributions: 7, badge: 'Active Contributor', avatarColor: 'bg-[#002147] text-white' }
-  ];
-
-  // User's active position mock data
-  const userStats = {
-    rank: 14,
-    points: 450,
-    contributions: 5,
-    badgesEarned: ['Verified Student', 'First Upload']
   };
 
   const isTeacher = authenticatedUser?.role === 'teacher';
@@ -322,253 +290,14 @@ export default function App() {
               </div>
             )}
 
-            {/* VIEW 3: General Academic Honors & Styled Leaderboard View */}
+            {/* VIEW 3: Honor Roll (real rankings from GET /api/leaderboard) */}
             {currentView === 'leaderboard' && (
-              <div className="w-full max-w-5xl mx-auto space-y-6">
-                
-                {/* Header Navigation */}
-                <div className="flex items-center justify-between bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                  <button
-                    type="button"
-                    onClick={() => setCurrentView('dashboard')}
-                    className="inline-flex items-center gap-2 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-bold text-slate-800 transition-colors cursor-pointer"
-                  >
-                    <ArrowLeft className="w-4 h-4" />
-                    <span>Back to Dashboard</span>
-                  </button>
-                  <div className="flex items-center gap-2">
-                    <Trophy className="w-5 h-5 text-amber-500" />
-                    <h2 className="text-sm sm:text-base font-black text-slate-900 font-varsity tracking-wide uppercase">
-                      Rizalian Academic Honor Roll &amp; Contributor Leaderboard
-                    </h2>
-                  </div>
-                </div>
-
-                {/* USER PERSONAL PERFORMANCE BANNER */}
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                  {/* My Ranking & My Contribution Points Banner */}
-                  <div className="md:col-span-8 bg-gradient-to-r from-[#002147] via-[#092B54] to-[#001733] text-white p-6 rounded-2xl border border-amber-400/40 shadow-md relative overflow-hidden flex flex-col justify-between">
-                    <div className="absolute top-0 right-0 w-80 h-80 bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
-
-                    <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div>
-                        <span className="text-[10px] font-black uppercase text-amber-400 tracking-wider bg-white/10 px-2.5 py-0.5 rounded-full border border-amber-400/30">
-                          My Honor Standings
-                        </span>
-                        <h3 className="text-xl font-black mt-2">{authenticatedUser?.name || 'Rizalian Student'}</h3>
-                        <p className="text-xs text-slate-300 mt-0.5">{authenticatedUser?.program || 'College Student'}</p>
-                      </div>
-
-                      {/* Stat Metrics */}
-                      <div className="flex items-center gap-3">
-                        <div className="bg-white/10 border border-white/20 p-3 rounded-xl text-center min-w-[100px]">
-                          <span className="text-[10px] uppercase font-bold text-slate-300 block">My Ranking</span>
-                          <span className="text-xl font-black text-amber-400 flex items-center justify-center gap-1">
-                            #{userStats.rank}
-                            <TrendingUp className="w-4 h-4 text-emerald-400" />
-                          </span>
-                          <span className="text-[9px] text-slate-400 block mt-0.5">Overall Campus</span>
-                        </div>
-
-                        <div className="bg-white/10 border border-white/20 p-3 rounded-xl text-center min-w-[110px]">
-                          <span className="text-[10px] uppercase font-bold text-slate-300 block">My Points</span>
-                          <span className="text-xl font-black text-amber-300 flex items-center justify-center gap-1">
-                            <Zap className="w-4 h-4 fill-amber-300 text-amber-300" />
-                            {userStats.points}
-                          </span>
-                          <span className="text-[9px] text-slate-400 block mt-0.5">Contribution Pts</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Personal Badges Bar */}
-                    <div className="relative z-10 pt-4 mt-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-2 text-xs">
-                      <div className="flex items-center gap-2">
-                        <span className="text-slate-400 text-[11px] font-medium">Earned Recognition:</span>
-                        {userStats.badgesEarned.map((badge) => (
-                          <span key={badge} className="bg-amber-400/20 text-amber-300 border border-amber-400/30 px-2 py-0.5 rounded-md text-[10px] font-extrabold flex items-center gap-1">
-                            <Award className="w-3 h-3 text-amber-400" />
-                            {badge}
-                          </span>
-                        ))}
-                      </div>
-                      <span className="text-[11px] text-slate-300 italic">
-                        Upload reviewers to earn <strong>+50 pts</strong> each!
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Contributor Recognition Card */}
-                  <div className="md:col-span-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-3">
-                    <div>
-                      <div className="flex items-center gap-2 text-amber-600 font-extrabold text-xs">
-                        <Sparkles className="w-4 h-4" />
-                        <span>Contributor Recognition</span>
-                      </div>
-                      <h4 className="text-sm font-black text-slate-900 mt-1">How Points Work</h4>
-                      <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                        Points are awarded when you share verified study guides, answer peer questions, and publish course reviewers.
-                      </p>
-                    </div>
-
-                    <div className="space-y-1.5 border-t border-slate-100 pt-3">
-                      <div className="flex items-center justify-between text-[11px] text-slate-700">
-                        <span className="flex items-center gap-1.5 font-medium"><UploadCloud className="w-3.5 h-3.5 text-blue-600" /> Share Reviewer</span>
-                        <span className="font-bold text-emerald-600">+50 Pts</span>
-                      </div>
-                      <div className="flex items-center justify-between text-[11px] text-slate-700">
-                        <span className="flex items-center gap-1.5 font-medium"><UserCheck className="w-3.5 h-3.5 text-amber-600" /> Answer Peer Inquiry</span>
-                        <span className="font-bold text-emerald-600">+20 Pts</span>
-                      </div>
-                      <div className="flex items-center justify-between text-[11px] text-slate-700">
-                        <span className="flex items-center gap-1.5 font-medium"><Star className="w-3.5 h-3.5 text-amber-500" /> 5-Star Material Rating</span>
-                        <span className="font-bold text-emerald-600">+10 Pts</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* TOP 3 PODIUM RECOGNITION */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-                  {/* #2 Rank */}
-                  <div className="bg-white p-5 rounded-2xl border-2 border-slate-200 shadow-sm flex flex-col items-center text-center relative order-2 md:order-1">
-                    <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-700 font-black text-lg flex items-center justify-center border-2 border-slate-300 mb-2 shadow-inner">
-                      2
-                    </div>
-                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Runner Up</span>
-                    <h4 className="text-sm font-black text-slate-900 mt-1">{leaderboardData[1].name}</h4>
-                    <p className="text-[11px] text-slate-500">{leaderboardData[1].program}</p>
-                    <span className="mt-2 bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                      <Award className="w-3 h-3 text-slate-500" />
-                      {leaderboardData[1].badge}
-                    </span>
-                    <p className="text-base font-black text-[#002147] mt-3">{leaderboardData[1].points} <span className="text-xs font-semibold text-slate-500">Pts</span></p>
-                  </div>
-
-                  {/* #1 Rank - Champion */}
-                  <div className="bg-gradient-to-b from-amber-50 via-white to-amber-50/30 p-6 rounded-2xl border-2 border-amber-400 shadow-md flex flex-col items-center text-center relative order-1 md:order-2 transform md:-translate-y-2">
-                    <div className="absolute -top-3 bg-amber-400 text-blue-950 font-black text-[10px] uppercase px-3 py-0.5 rounded-full shadow-sm flex items-center gap-1">
-                      <Trophy className="w-3 h-3 text-blue-950" /> Campus Scholar Leader
-                    </div>
-                    <div className="w-16 h-16 rounded-2xl bg-amber-400 text-[#002147] font-black text-2xl flex items-center justify-center border-2 border-white mb-2 shadow-md">
-                      1
-                    </div>
-                    <span className="text-[10px] font-black uppercase text-amber-700 tracking-wider">#1 Overall Contributor</span>
-                    <h4 className="text-base font-black text-slate-900 mt-1">{leaderboardData[0].name}</h4>
-                    <p className="text-[11px] text-slate-500">{leaderboardData[0].program}</p>
-                    <span className="mt-2 bg-amber-400/20 text-amber-900 border border-amber-400/40 text-[10px] font-extrabold px-3 py-0.5 rounded-full flex items-center gap-1">
-                      <Sparkles className="w-3 h-3 text-amber-600" />
-                      {leaderboardData[0].badge}
-                    </span>
-                    <p className="text-xl font-black text-[#002147] mt-3">{leaderboardData[0].points} <span className="text-xs font-semibold text-slate-500">Pts</span></p>
-                  </div>
-
-                  {/* #3 Rank */}
-                  <div className="bg-white p-5 rounded-2xl border-2 border-slate-200 shadow-sm flex flex-col items-center text-center relative order-3">
-                    <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-900 font-black text-lg flex items-center justify-center border-2 border-amber-300 mb-2 shadow-inner">
-                      3
-                    </div>
-                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider">3rd Place</span>
-                    <h4 className="text-sm font-black text-slate-900 mt-1">{leaderboardData[2].name}</h4>
-                    <p className="text-[11px] text-slate-500">{leaderboardData[2].program}</p>
-                    <span className="mt-2 bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                      <Medal className="w-3 h-3 text-amber-600" />
-                      {leaderboardData[2].badge}
-                    </span>
-                    <p className="text-base font-black text-[#002147] mt-3">{leaderboardData[2].points} <span className="text-xs font-semibold text-slate-500">Pts</span></p>
-                  </div>
-                </div>
-
-                {/* FULL RANKINGS TABLE */}
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                  <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                    <div>
-                      <h3 className="text-sm font-black text-slate-900">University Top Contributors</h3>
-                      <p className="text-xs text-slate-500">Live points breakdown based on verified study guide uploads and peer assistance.</p>
-                    </div>
-                    <span className="text-xs font-bold text-amber-700 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
-                      Top 10 Active Students
-                    </span>
-                  </div>
-
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-black uppercase text-slate-500 tracking-wider">
-                          <th className="py-3 px-4">Rank</th>
-                          <th className="py-3 px-4">Student Name</th>
-                          <th className="py-3 px-4">College &amp; Program</th>
-                          <th className="py-3 px-4 text-center">Badge &amp; Status</th>
-                          <th className="py-3 px-4 text-center">Materials Shared</th>
-                          <th className="py-3 px-4 text-right">Points</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 text-xs">
-                        {leaderboardData.map((item) => (
-                          <tr key={item.rank} className="hover:bg-slate-50/80 transition-colors">
-                            <td className="py-3 px-4 font-black">
-                              <span className={`w-6 h-6 rounded-full inline-flex items-center justify-center font-black text-xs ${
-                                item.rank === 1 ? 'bg-amber-400 text-blue-950' :
-                                item.rank === 2 ? 'bg-slate-300 text-slate-900' :
-                                item.rank === 3 ? 'bg-amber-700 text-white' : 'text-slate-500'
-                              }`}>
-                                #{item.rank}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4 font-bold text-slate-900">
-                              {item.name}
-                            </td>
-                            <td className="py-3 px-4">
-                              <span className="block font-semibold text-slate-800">{item.college}</span>
-                              <span className="text-[10px] text-slate-500">{item.program}</span>
-                            </td>
-                            <td className="py-3 px-4 text-center">
-                              <span className="bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
-                                <Award className="w-3 h-3 text-amber-500" />
-                                {item.badge}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4 text-center font-bold text-slate-700">
-                              {item.contributions} Reviewers
-                            </td>
-                            <td className="py-3 px-4 text-right font-black text-[#002147]">
-                              {item.points} Pts
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Sticky Footer Row: MY RANKING PINNED */}
-                  <div className="bg-blue-950 text-white p-4 border-t-2 border-amber-400 flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <span className="w-8 h-8 rounded-xl bg-amber-400 text-blue-950 font-black text-xs flex items-center justify-center shrink-0">
-                        #{userStats.rank}
-                      </span>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-xs">{authenticatedUser?.name || 'Rizalian Student'}</span>
-                          <span className="bg-amber-400 text-blue-950 font-black text-[9px] uppercase px-2 py-0.2 rounded">Your Position</span>
-                        </div>
-                        <p className="text-[11px] text-slate-300">{authenticatedUser?.program || 'College Student'}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-4 text-xs font-semibold">
-                      <span>Shared: <strong>{userStats.contributions} Materials</strong></span>
-                      <span className="text-amber-400 font-black text-sm">{userStats.points} Points</span>
-                      <button
-                        onClick={() => setCurrentView('community')}
-                        className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-blue-950 font-bold text-xs rounded-xl transition-colors cursor-pointer"
-                      >
-                        Upload Materials to Rank Up
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
+              <HonorRollView
+                user={authenticatedUser}
+                refreshKey={resourceVersion}
+                onBack={() => setCurrentView('dashboard')}
+                onUpload={() => setCurrentView('community')}
+              />
             )}
           </>
         ) : (
