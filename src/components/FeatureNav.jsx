@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, BookOpen, Bookmark, Languages, QrCode } from 'lucide-react';
+import { LayoutDashboard, BookOpen, Bookmark, Languages, QrCode, Gamepad2 } from 'lucide-react';
 
 // Shortcuts to the learning features, shown for both students and faculty.
 export function FeatureNav({ view, onChange, onScan }) {
@@ -8,6 +8,7 @@ export function FeatureNav({ view, onChange, onScan }) {
     { id: 'community', label: 'Reviewer Community', icon: BookOpen },
     { id: 'bookmarks', label: 'Saved', icon: Bookmark },
     { id: 'translate', label: 'Translate Document', icon: Languages },
+    { id: 'quiz', label: 'Quiz Game', icon: Gamepad2 },
   ];
 
   const base = 'inline-flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold cursor-pointer';

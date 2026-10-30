@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  X, Star, Bookmark, QrCode, Eye, Download, Languages, MessageSquare, Trash2, LoaderCircle, Send,
+  X, Star, Bookmark, QrCode, Eye, Download, Languages, MessageSquare, Trash2, LoaderCircle, Send, Gamepad2,
 } from 'lucide-react';
 import PdfPreview from './PdfPreview';
 import QrShareModal from './QrShareModal';
@@ -9,7 +9,7 @@ import { fetchBlob, saveBlob } from '../utils/Authedfile';
 
 // Everything about one resource: details, rating, bookmark, QR share, comments.
 // Opened from the community feed, the Saved list, the QR scanner, and shared links.
-export default function ResourceDetailModal({ resourceId, token, currentUser, onClose, onChanged, onTranslate }) {
+export default function ResourceDetailModal({ resourceId, token, currentUser, onClose, onChanged, onTranslate, onQuiz }) {
   const [resource, setResource] = useState(null);
   const [loadError, setLoadError] = useState('');
   const [comments, setComments] = useState([]);
@@ -196,6 +196,11 @@ export default function ResourceDetailModal({ resourceId, token, currentUser, on
                 {onTranslate && (
                   <button type="button" onClick={() => onTranslate(resource)} className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 font-bold text-slate-700 hover:bg-slate-50">
                     <Languages className="h-4 w-4" /> Translate
+                  </button>
+                )}
+                {onQuiz && (
+                  <button type="button" onClick={() => onQuiz(resource)} className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-amber-400 px-3 py-2 font-bold text-[#002147] hover:bg-amber-300">
+                    <Gamepad2 className="h-4 w-4" /> Play Quiz
                   </button>
                 )}
               </div>

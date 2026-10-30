@@ -13,6 +13,7 @@ import { BookmarksView } from './components/BookmarksView';
 import { DocumentTranslator } from './components/DocumentTranslator';
 import ResourceDetailModal from './components/ResourceDetailModal';
 import QrScannerModal from './components/QrScannerModal';
+import QuizGame from './components/QuizGame';
 import { captureIncomingResource, takePendingResource } from './utils/resourceLinks';
 import { CampusFooter } from './components/CampusFooter';
 import {
@@ -48,12 +49,13 @@ export default function App() {
   const [resetLink] = useState(INITIAL_RESET_LINK);
   const [activeTab, setActiveTab] = useState(INITIAL_RESET_LINK ? 'reset' : 'login');
   const [authenticatedUser, setAuthenticatedUser] = useState(null);
-  const [currentView, setCurrentView] = useState('dashboard'); // 'dashboard' | 'community' | 'leaderboard' | 'bookmarks' | 'translate'
+  const [currentView, setCurrentView] = useState('dashboard'); // 'dashboard' | 'community' | 'leaderboard' | 'bookmarks' | 'translate' | 'quiz'
   const [dashboardHome, setDashboardHome] = useState(0); // bumps when "Dashboard" is clicked so the dashboard returns to its Overview tab
   // Learning features shared by students and faculty
   const [openResourceId, setOpenResourceId] = useState(null); // resource detail modal (QR links, saved list, feed)
   const [scannerOpen, setScannerOpen] = useState(false);
   const [translateResource, setTranslateResource] = useState(null); // resource sent to the translator
+  const [quizResource, setQuizResource] = useState(null); // resource sent to the quiz game
   const [resourceVersion, setResourceVersion] = useState(0); // bumps when a rating / bookmark / comment changes
   // True while we check a saved token against the server on first load.
   const [restoringSession, setRestoringSession] = useState(() =>
@@ -108,6 +110,7 @@ export default function App() {
     setOpenResourceId(null);
     setScannerOpen(false);
     setTranslateResource(null);
+    setQuizResource(null);
   };
 
   // Merge fields returned by the API (e.g. a new profile_photo_url) into the signed-in user.
@@ -120,7 +123,7 @@ export default function App() {
       setCurrentView('community');
     } else if (destination === 'leaderboard') {
       setCurrentView('leaderboard');
-    } else if (destination === 'bookmarks' || destination === 'translate') {
+    } else if (destination === 'bookmarks' || destination === 'translate' || destination === 'quiz') {
       setCurrentView(destination);
     } else {
       setCurrentView('dashboard');
@@ -156,6 +159,12 @@ export default function App() {
     setOpenResourceId(null);
     setTranslateResource(resource);
     setCurrentView('translate');
+  };
+
+  const openQuiz = (resource) => {
+    setOpenResourceId(null);
+    setQuizResource(resource);
+    setCurrentView('quiz');
   };
 
   if (restoringSession) {
@@ -260,6 +269,15 @@ export default function App() {
                 token={authenticatedUser.token}
                 initialResource={translateResource}
                 onInitialResourceUsed={() => setTranslateResource(null)}
+              />
+            )}
+
+            {/* Quiz game built from a reviewer's QR code or file */}
+            {currentView === 'quiz' && (
+              <QuizGame
+                token={authenticatedUser.token}
+                initialResource={quizResource}
+                onInitialResourceUsed={() => setQuizResource(null)}
               />
             )}
 
@@ -755,6 +773,7 @@ export default function App() {
           onClose={() => setOpenResourceId(null)}
           onChanged={() => setResourceVersion((v) => v + 1)}
           onTranslate={openTranslator}
+          onQuiz={openQuiz}
         />
       )}
 

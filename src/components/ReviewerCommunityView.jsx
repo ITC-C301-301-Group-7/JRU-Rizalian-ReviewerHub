@@ -18,7 +18,6 @@ import {
   Flag,
   ShieldCheck,
   Building2,
-  ExternalLink,
   Camera,
   Star,
   UploadCloud,
@@ -38,6 +37,7 @@ import QrShareModal from './QrShareModal';
 import QrScannerModal from './QrScannerModal';
 import { TopReviewersPanel } from './TopReviewersPanel';
 import { VideoSection } from './VideoSection';
+import { OfficialResourcesPanel } from './OfficialResourcesPanel';
 import { apiRequest } from '../utils/teacherApi';
 import { fetchBlob, saveBlob } from '../utils/Authedfile';
 import { API_URL } from '../utils/Session';
@@ -228,40 +228,6 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
     loadReviewers({ silent: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey]);
-
-  // Official Institutional Resources Data
-  const officialResources = [
-    {
-      id: 'off-1',
-      title: 'JRU Institutional Student Handbook & Academic Policies (2025–2026)',
-      institution: 'Jose Rizal University - Academic Affairs',
-      category: 'Official Handbook',
-      courseCode: 'JRU-GEN',
-      verifiedBy: 'JRU Office of the Registrar',
-      downloadUrl: '#',
-      fileSize: '4.2 MB PDF'
-    },
-    {
-      id: 'off-2',
-      title: 'CHED Curriculum Standards for BS Information Technology',
-      institution: 'Commission on Higher Education (CHED)',
-      category: 'Curriculum Guide',
-      courseCode: 'CHED-IT',
-      verifiedBy: 'CHED Higher Education Regional Office',
-      downloadUrl: '#',
-      fileSize: '1.8 MB PDF'
-    },
-    {
-      id: 'off-3',
-      title: 'OpenStax Principles of Financial Accounting Reference Guide',
-      institution: 'Rice University / Open Educational Resources',
-      category: 'Open Textbook',
-      courseCode: 'ACT 101',
-      verifiedBy: 'JRU Library Services',
-      downloadUrl: '#',
-      fileSize: '12.5 MB PDF'
-    }
-  ];
 
   // Leaderboard (loaded from the Laravel API; follows the This Month / This Semester / All-Time buttons)
   const [leaderboard, setLeaderboard] = useState({
@@ -872,42 +838,25 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
         </div>
       )}
 
-      {/* TAB 2: OFFICIAL INSTITUTIONAL LEARNING RESOURCES */}
+      {/* TAB 2: OFFICIAL LEARNING RESOURCES (faculty-published documents + trusted external references) */}
       {activeTab === 'official' && (
         <div className="space-y-4">
           <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl text-xs text-blue-900 flex items-start gap-3">
             <Building2 className="w-5 h-5 text-blue-700 shrink-0 mt-0.5" />
             <div>
-              <span className="font-bold block">Official &amp; Verified Institutional Repository</span>
-              <span>Materials in this section are verified documents provided directly by Jose Rizal University offices, CHED, and open educational partners.</span>
+              <span className="font-bold block">Official Learning Resources</span>
+              <span>Documents published by verified JRU faculty, plus trusted references from CHED and open-education publishers.</span>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {officialResources.map((res) => (
-              <div key={res.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className="text-[10px] font-extrabold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full flex items-center gap-1">
-                      <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                      {res.verifiedBy}
-                    </span>
-                    <span className="text-[10px] text-slate-400 font-semibold">{res.fileSize}</span>
-                  </div>
-                  <h4 className="text-sm font-black text-slate-900">{res.title}</h4>
-                  <p className="text-xs text-slate-500 mt-1">{res.institution}</p>
-                </div>
-
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">{res.category}</span>
-                  <a href={res.downloadUrl} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#002147] text-white rounded-lg text-xs font-bold hover:bg-blue-900 transition-colors">
-                    <span>Access Document</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
-                </div>
-              </div>
-            ))}
-          </div>
+          <OfficialResourcesPanel
+            token={token}
+            search={searchQuery}
+            college={selectedCollege}
+            onOpenResource={onOpenResource}
+            refreshKey={refreshKey}
+            isTeacher={currentUser?.role === 'teacher'}
+          />
         </div>
       )}
 
