@@ -46,9 +46,33 @@ php artisan key:generate
 
 On a fresh Windows PHP, uploads fail with **422 "The file failed to upload"** even for small files, because PHP has no writable temporary folder and only allows 2 MB.
 
-1. Create a folder: `mkdir C:\php-tmp`
-2. Find the active config file: `php --ini` and read **Loaded Configuration File**. If it says `(none)`, copy `php.ini-development` to `php.ini` in the PHP folder.
-3. Open that `php.ini` in Notepad (as Administrator for XAMPP) and set these lines, with no `;` at the start:
+**1. Create the temp folder**
+
+```powershell
+mkdir C:\php-tmp
+```
+
+**2. Find your php.ini**
+
+```powershell
+php --ini
+```
+
+Read the line **Loaded Configuration File**. It looks like `C:\xampp\php\php.ini` (XAMPP) or `C:\Users\YourName\.config\herd\bin\php84\php.ini` (Herd). If it says `(none)`, copy `php.ini-development` in the PHP folder to a new file named `php.ini`, then run `php --ini` again.
+
+**3. Open it in Notepad**
+
+Copy the path from step 2 and open it with Notepad. Keep the quotes, because paths with spaces need them:
+
+```powershell
+notepad "C:\xampp\php\php.ini"
+```
+
+Replace the path with your own. If Windows refuses to save the file (common with XAMPP in `C:\xampp`), close Notepad, open the Start menu, type **Notepad**, right-click it, choose **Run as administrator**, then use **File > Open** and paste the same path.
+
+**4. Change these settings**
+
+In Notepad press **Ctrl+F**, find each line below, set it exactly like this, and remove any `;` at the start of the line. If a line does not exist, add it at the bottom of the file.
 
 ```ini
 file_uploads = On
@@ -57,10 +81,19 @@ upload_max_filesize = 25M
 post_max_size = 30M
 ```
 
-4. Stop `php artisan serve` (Ctrl+C) and start it again.
-5. Check: `php -i | findstr /i "upload_tmp_dir upload_max_filesize post_max_size"` should show `C:\php-tmp`, `25M` and `30M`.
+Do not touch `max_file_uploads`. It is a number of files (for example `20`), not a size. Save with **Ctrl+S**.
 
-`max_file_uploads` is a number of files (for example `20`), not a size.
+**5. Restart the backend**
+
+In the terminal running `php artisan serve`, press **Ctrl+C**, then start it again. PHP only reads `php.ini` when it starts. (With Herd, also quit and reopen Herd from the system tray.)
+
+**6. Check it worked**
+
+```powershell
+php -i | findstr /i "upload_tmp_dir upload_max_filesize post_max_size"
+```
+
+You should see `C:\php-tmp`, `25M` and `30M`.
 
 ## 4. Database
 
