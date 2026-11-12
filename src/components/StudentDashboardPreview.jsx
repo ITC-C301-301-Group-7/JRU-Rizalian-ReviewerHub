@@ -5,7 +5,7 @@ import { apiRequest } from '../utils/teacherApi';
 import { StudyReviewersPanel } from './StudyReviewersPanel';
 import { TopReviewersPanel } from './TopReviewersPanel';
 import TierBadge from './TierBadge';
-import { downloadsLabel, previewLabel } from '../utils/tier';
+import { downloadsLabel, previewLabel, tierLabel } from '../utils/tier';
 import {
   BookOpen, GraduationCap, LogOut, Trophy,
   CheckCircle, Building2, Sparkles, ShieldCheck, Lock,
@@ -148,7 +148,23 @@ export function StudentDashboardPreview({ student, onSignOut, onNavigate, onUser
         <div className="flex items-center gap-2"><TierBadge tier={tier.key} /><span className="text-xs font-bold text-slate-700">{tier.points} Pts</span></div>
         <p className="text-[11px] text-slate-500">{previewLabel(tier)} · {downloadsLabel(tier)}</p>
       </div>
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-valuenow={tier.progress} aria-valuemin={0} aria-valuemax={100} aria-label="Progress to the next tier"><div className="h-full rounded-full bg-amber-400" style={{ width: `${tier.progress}%` }} /></div>
+      {(() => {
+        // Blue range from the start of this tier to the start of the next one, with a marker at the student's points.
+        const currentRow = Array.isArray(tier.tiers) ? tier.tiers.find((row) => row.key === tier.key) : null;
+        const rangeStart = currentRow?.minPoints ?? 0;
+        const rangeEnd = tier.next?.minPoints ?? null;
+        const percent = Math.max(0, Math.min(100, tier.progress));
+        return <div className="mt-4">
+          <div className="relative pt-7">
+            <div className="absolute top-0 -translate-x-1/2 text-center" style={{ left: `clamp(28px, ${percent}%, calc(100% - 28px))` }}>
+              <span className="block whitespace-nowrap rounded-md bg-blue-700 px-2 py-0.5 text-[10px] font-black text-white">{tier.points} pts</span>
+              <span className="mx-auto block h-0 w-0 border-x-4 border-t-4 border-x-transparent border-t-blue-700" />
+            </div>
+            <div className="h-3 overflow-hidden rounded-full bg-blue-100" role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100} aria-label={`${tier.points} points, ${percent}% of the way to the next tier`}><div className="h-full rounded-full bg-blue-600" style={{ width: `${percent}%` }} /></div>
+          </div>
+          <div className="mt-1 flex justify-between gap-2 text-[10px] font-bold text-slate-500"><span>{tierLabel(tier.key)} · {rangeStart} pts</span><span>{rangeEnd !== null ? `${tier.next.name} · ${rangeEnd} pts` : 'Top tier reached'}</span></div>
+        </div>;
+      })()}
       <p className="mt-2 text-[11px] text-slate-500">{tier.next ? `${tier.pointsToNext} more points to reach ${tier.next.name}. Upload a reviewer or earn 5-star ratings to level up.` : 'You have reached the highest tier.'}</p>
       {Array.isArray(tier.tiers) && tier.tiers.length > 0 && <>
         <button type="button" onClick={() => setShowTiers((open) => !open)} aria-expanded={showTiers} className="mt-3 text-[11px] font-bold text-[#002147] underline underline-offset-2 hover:text-amber-600">{showTiers ? 'Hide tier information' : 'View all tiers'}</button>
