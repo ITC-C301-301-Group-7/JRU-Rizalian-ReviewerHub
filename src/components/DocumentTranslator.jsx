@@ -39,6 +39,7 @@ export function DocumentTranslator({ token, initialResource, onInitialResourceUs
   const [loadingSource, setLoadingSource] = useState('');
   const [copied, setCopied] = useState(false);
   const abortRef = useRef(null);
+  const [convertedPdfUrl, setConvertedPdfUrl] = useState(''); // server PDF copy, for old .doc / .ppt
 
   const busy = extracting || translating;
 
@@ -49,17 +50,19 @@ export function DocumentTranslator({ token, initialResource, onInitialResourceUs
     setError('');
   };
 
-  const chooseFile = useCallback((chosen) => {
+  // serverPdfUrl is only set for community resources, where the server can give a PDF copy.
+  const chooseFile = useCallback((chosen, serverPdfUrl = '') => {
     setError('');
     if (!chosen) return;
 
     const ext = extensionOf(chosen.name);
-    if (ext === 'doc' || ext === 'ppt') {
-      setError(`Old .${ext} files can’t be read here. Save it as .${ext}x or PDF in Word/PowerPoint and upload that instead.`);
-      return;
-    }
-    if (!ACCEPTED_EXTENSIONS.includes(ext)) {
-      setError('Unsupported file type. Use a PDF, Word (.docx), PowerPoint (.pptx), or image (PNG, JPG, WEBP).');
+    const legacyFromServer = (ext === 'doc' || ext === 'ppt') && Boolean(serverPdfUrl);
+    if (!legacyFromServer && !ACCEPTED_EXTENSIONS.includes(ext)) {
+      setError(
+        ext === 'doc' || ext === 'ppt'
+          ? `Old .${ext} files can’t be read from your device. Save it as .${ext}x or PDF in Word/PowerPoint and upload that instead.`
+          : 'Unsupported file type. Use a PDF, Word (.docx), PowerPoint (.pptx), or image (PNG, JPG, WEBP).'
+      );
       return;
     }
     if (chosen.size > MAX_FILE_BYTES) {
@@ -68,6 +71,7 @@ export function DocumentTranslator({ token, initialResource, onInitialResourceUs
     }
 
     setFile(chosen);
+    setConvertedPdfUrl(serverPdfUrl);
     setExtracted(null);
     setText('');
     setTranslation('');
@@ -84,7 +88,7 @@ export function DocumentTranslator({ token, initialResource, onInitialResourceUs
     fetchBlob(initialResource.downloadUrl, token, controller.signal)
       .then((blob) => {
         const name = initialResource.filename || `${initialResource.title}.pdf`;
-        chooseFile(new File([blob], name, { type: initialResource.mimeType || blob.type }));
+        chooseFile(new File([blob], name, { type: initialResource.mimeType || blob.type }), initialResource.previewUrl || '');
       })
       .catch((err) => err.name !== 'AbortError' && setError(err.message))
       .finally(() => {
@@ -110,6 +114,8 @@ export function DocumentTranslator({ token, initialResource, onInitialResourceUs
 
     try {
       const result = await extractText(file, {
+        token, // used to fetch the server's PDF copy of old .doc / .ppt files
+        convertedPdfUrl,
         ocrLang: languageByCode(sourceLang).ocr,
         signal: controller.signal,
         onProgress: setProgress,

@@ -6,6 +6,9 @@
 //
 // The heavy libraries are loaded on demand so the rest of the app stays light.
 
+import { fetchBlob } from './Authedfile';
+import { API_URL } from './Session';
+
 export const MAX_FILE_BYTES = 20 * 1024 * 1024;
 export const MAX_PDF_PAGES = 40;
 export const ACCEPTED_EXTENSIONS = ['pdf', 'docx', 'pptx', 'png', 'jpg', 'jpeg', 'webp'];
@@ -217,18 +220,35 @@ async function extractImage(file, { ocrLang, onProgress }) {
 export async function extractText(file, options = {}) {
   const ext = extensionOf(file.name);
 
-  if (ext === 'doc' || ext === 'ppt') {
+  const isLegacyOffice = ext === 'doc' || ext === 'ppt';
+
+  if (isLegacyOffice && !(options.token && options.convertedPdfUrl)) {
     throw new Error(
       `Old .${ext} files cannot be read in the browser. Open it in Word/PowerPoint and save it as .${ext}x or PDF, then upload that.`
     );
   }
-  if (!ACCEPTED_EXTENSIONS.includes(ext)) {
+  if (!isLegacyOffice && !ACCEPTED_EXTENSIONS.includes(ext)) {
     throw new Error('Unsupported file type. Use a PDF, Word (.docx), PowerPoint (.pptx), or image file.');
   }
   if (file.size > MAX_FILE_BYTES) throw new Error('File is too large. The maximum size is 20 MB.');
 
   const opts = { ocrLang: 'eng', ...options };
   options.onProgress?.({ label: 'Starting', fraction: 0 });
+
+  // Old .doc / .ppt cannot be parsed in the browser, but the server already converts them to PDF
+  // for previews. Download that PDF and read it like any other PDF.
+  if (isLegacyOffice) {
+    const url = options.convertedPdfUrl.startsWith('http') ? options.convertedPdfUrl : `${API_URL}${options.convertedPdfUrl}`;
+    options.onProgress?.({ label: 'Converting the file', fraction: 0.02 });
+    const pdfBlob = await fetchBlob(url, options.token, options.signal);
+    const pdfFile = new File([pdfBlob], file.name.replace(/\.[^.]+$/, '') + '.pdf', { type: 'application/pdf' });
+    const converted = await extractPdf(pdfFile, opts);
+    options.onProgress?.({ label: 'Done', fraction: 1 });
+    if (!converted.text) {
+      throw new Error('No readable text was found in this file. Try a clearer, higher-resolution scan, or pick the correct document language.');
+    }
+    return converted;
+  }
 
   let result;
   if (ext === 'pdf') result = await extractPdf(file, opts);

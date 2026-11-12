@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import PdfPreview from "../components/PdfPreview";
+import { isPreviewable } from "../utils/fileTypes";
 import { fetchBlob, saveBlob } from "../utils/Authedfile";
 
 const API_URL = (
@@ -195,9 +196,8 @@ export default function PeerReviewerFeed({ token }) {
                 {!loading && !error && (
                     <div className="space-y-4">
                         {filteredResources.map((resource) => {
-                            const isPdf =
-                                resource.mimeType === "application/pdf" ||
-                                resource.filename?.toLowerCase().endsWith(".pdf");
+                            // PDF, Word, PowerPoint and pictures can all be previewed.
+                            const canPreview = isPreviewable(resource);
 
                             return (
                                 <article
@@ -273,7 +273,7 @@ export default function PeerReviewerFeed({ token }) {
                                         </p>
 
                                         <div className="flex flex-wrap items-center gap-2">
-                                            {isPdf && (
+                                            {canPreview && (
                                                 <button
                                                     type="button"
                                                     onClick={() =>

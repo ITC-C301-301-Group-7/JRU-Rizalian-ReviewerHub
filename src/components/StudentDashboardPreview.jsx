@@ -42,6 +42,7 @@ export function StudentDashboardPreview({ student, onSignOut, onNavigate, onUser
     return () => controller.abort();
   }, [student?.token, refreshKey]);
   // Tier badge, points, allowances and progress to the next tier (GET /api/tier).
+  const [showTiers, setShowTiers] = useState(false); // "All tiers" table open or closed
   const [tier, setTier] = useState(null); // null while loading or if it could not be loaded
   useEffect(() => {
     if (!student?.token) return undefined;
@@ -149,6 +150,25 @@ export function StudentDashboardPreview({ student, onSignOut, onNavigate, onUser
       </div>
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-valuenow={tier.progress} aria-valuemin={0} aria-valuemax={100} aria-label="Progress to the next tier"><div className="h-full rounded-full bg-amber-400" style={{ width: `${tier.progress}%` }} /></div>
       <p className="mt-2 text-[11px] text-slate-500">{tier.next ? `${tier.pointsToNext} more points to reach ${tier.next.name}. Upload a reviewer or earn 5-star ratings to level up.` : 'You have reached the highest tier.'}</p>
+      {Array.isArray(tier.tiers) && tier.tiers.length > 0 && <>
+        <button type="button" onClick={() => setShowTiers((open) => !open)} aria-expanded={showTiers} className="mt-3 text-[11px] font-bold text-[#002147] underline underline-offset-2 hover:text-amber-600">{showTiers ? 'Hide tier information' : 'View all tiers'}</button>
+        {showTiers && <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200">
+          <table className="w-full min-w-[420px] text-left text-[11px]">
+            <thead className="bg-slate-50 text-slate-500"><tr><th className="px-3 py-2 font-bold">Tier</th><th className="px-3 py-2 font-bold">Points</th><th className="px-3 py-2 font-bold">Preview pages</th><th className="px-3 py-2 font-bold">Downloads / month</th></tr></thead>
+            <tbody>
+              {tier.tiers.map((row) => {
+                const isCurrent = row.key === tier.key;
+                return <tr key={row.key} className={`border-t border-slate-100 ${isCurrent ? 'bg-amber-50 font-bold text-[#002147]' : 'text-slate-700'}`}>
+                  <td className="px-3 py-2"><span className="inline-flex items-center gap-2"><TierBadge tier={row.key} size="sm" />{isCurrent && <span className="text-[9px] font-black uppercase text-amber-600">You are here</span>}</span></td>
+                  <td className="px-3 py-2">{row.minPoints >= 900 ? `${row.minPoints}+` : row.minPoints}</td>
+                  <td className="px-3 py-2">{row.previewPages == null ? 'Full file' : row.minPoints === 0 ? `first ${row.previewPages} pages (free)` : `${row.previewPages} pages`}</td>
+                  <td className="px-3 py-2">{row.downloadsPerMonth == null ? 'Unlimited' : row.downloadsPerMonth === 0 ? 'None' : `${row.downloadsPerMonth} per month`}</td>
+                </tr>;
+              })}
+            </tbody>
+          </table>
+        </div>}
+      </>}
     </section>}
 
     <nav className="flex gap-2 overflow-x-auto border-b border-slate-200">{tabs.map(([key, label]) => <button key={key} type="button" aria-current={tab === key ? 'page' : undefined} onClick={() => setTab(key)} className={`whitespace-nowrap border-b-2 px-4 pb-3 text-xs font-bold ${tab === key ? 'border-[#002147] text-[#002147]' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>{label}</button>)}</nav>

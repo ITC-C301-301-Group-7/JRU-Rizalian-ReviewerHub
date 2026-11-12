@@ -506,6 +506,8 @@ export default function QuizGame({ token, initialResource, onInitialResourceUsed
       const { file, meta } = await loadFile(controller.signal, (label, fraction) => setProgress({ label, fraction }));
 
       const extracted = await extractText(file, {
+        token, // used to fetch the server's PDF copy of old .doc / .ppt files
+        convertedPdfUrl: meta.previewUrl,
         signal: controller.signal,
         onProgress: (p) => setProgress({ label: p.label, fraction: 0.15 + p.fraction * 0.85 }),
       });
@@ -551,7 +553,7 @@ export default function QuizGame({ token, initialResource, onInitialResourceUsed
 
     return {
       file,
-      meta: { title: resource.title, subtitle: resource.courseCode ? `${resource.courseCode} · ${resource.filename || ''}` : resource.filename, key: `r${resource.id}` },
+      meta: { title: resource.title, subtitle: resource.courseCode ? `${resource.courseCode} · ${resource.filename || ''}` : resource.filename, key: `r${resource.id}`, previewUrl: resource.previewUrl },
     };
   }, [token]);
 

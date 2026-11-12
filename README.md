@@ -100,7 +100,7 @@ src/
 
 ## Notes and limits
 
-- **Document translation:** old `.doc` and `.ppt` files can't be read. Save them as `.docx`, `.pptx` or PDF. Text inside pictures in Word or PowerPoint files isn't read. Export to PDF instead. Only the first 40 pages of a PDF are read, and files can be up to 20 MB.
+- **Document translation:** old `.doc` and `.ppt` files can only be read when they are reviewers already in the community (the app uses the server's PDF copy). If you pick one from your own device, save it as `.docx`, `.pptx` or PDF first. Text inside pictures in Word or PowerPoint files isn't read. Export to PDF instead. Only the first 40 pages of a PDF are read, and files can be up to 20 MB.
 - **OCR:** the first scan downloads a language file, so it needs internet and can take a minute.
 - **Translation quota:** the free service has a small daily limit. See the backend README to raise it.
 - **QR scanning on a phone:** browsers only allow the camera on `https://` or `localhost`. For same-Wi-Fi testing, run `npm run dev -- --host` and set `VITE_PUBLIC_APP_URL` to your computer's address, for example `http://192.168.1.5:5173`. Otherwise the QR codes point to `localhost`. Uploading a picture of a QR code works on any address.

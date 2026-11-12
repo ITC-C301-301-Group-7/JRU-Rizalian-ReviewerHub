@@ -8,6 +8,7 @@ import {
   Bookmark, CheckCircle2, RefreshCw, ArrowRight,
 } from 'lucide-react';
 import PdfPreview from './PdfPreview';
+import TierBadge from './TierBadge';
 import { fetchBlob, saveBlob } from '../utils/Authedfile';
 import { teacherRequest, uploadWithProgress, formatFileSize, formatDate } from '../utils/teacherApi';
 import { JRU_DEPARTMENTS } from '../types';
@@ -1129,20 +1130,22 @@ function CommunityPanel({ overview }) {
         <ErrorBanner message={error} onRetry={() => setAttempt((n) => n + 1)} />
 
         <div className={`overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm transition-opacity ${loading && !firstLoad ? 'opacity-60' : ''}`} aria-busy={loading}>
-          <table className="w-full min-w-[640px] text-left text-sm">
+          <table className="hidden w-full text-left text-sm md:table">
             <caption className="sr-only">Community members</caption>
             <thead className="bg-slate-50 text-xs font-black uppercase tracking-wide text-slate-600">
               <tr>
                 <th scope="col" className="px-3 py-2.5">Member</th>
-                <th scope="col" className="px-3 py-2.5">ID</th>
+                <th scope="col" className="px-3 py-2.5">School ID</th>
+                <th scope="col" className="px-3 py-2.5">Email</th>
+                <th scope="col" className="px-3 py-2.5">Tier</th>
                 <th scope="col" className="px-3 py-2.5">College / Year</th>
                 <th scope="col" className="px-3 py-2.5">Uploads</th>
                 <th scope="col" className="px-3 py-2.5">Joined</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {firstLoad && Array.from({ length: 4 }, (_, i) => <tr key={i}><td colSpan={5} className="px-3 py-3"><SkeletonBlock className="h-8" /></td></tr>)}
-              {!loading && rows.length === 0 && <tr><td colSpan={5} className="px-3 py-8 text-center text-slate-600">No members found.</td></tr>}
+              {firstLoad && Array.from({ length: 4 }, (_, i) => <tr key={i}><td colSpan={8} className="px-3 py-3"><SkeletonBlock className="h-8" /></td></tr>)}
+              {!loading && rows.length === 0 && <tr><td colSpan={8} className="px-3 py-8 text-center text-slate-600">No members found.</td></tr>}
               {rows.map((u) => (
                 <tr key={u.id}>
                   <td className="px-3 py-2.5">
@@ -1152,9 +1155,12 @@ function CommunityPanel({ overview }) {
                         {u.role === 'teacher' ? 'Faculty' : 'Student'}
                       </span>
                     </p>
-                    <p className="text-xs text-slate-600">{u.email}</p>
                   </td>
-                  <td className="px-3 py-2.5 text-slate-700">{u.schoolId || '—'}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 font-mono text-xs text-slate-700">{u.schoolId || '—'}</td>
+                  <td className="px-3 py-2.5 text-xs text-slate-700"><a href={`mailto:${u.email}`} className="break-all hover:text-[#002147] hover:underline">{u.email}</a></td>
+                  <td className="whitespace-nowrap px-3 py-2.5">
+                    <div className="flex items-center gap-2"><TierBadge tier={u.tier} size="sm" />{u.points != null && <span className="text-xs font-bold text-slate-600">{u.points} pts</span>}</div>
+                  </td>
                   <td className="px-3 py-2.5 text-slate-700">{[u.department, u.yearLevel].filter(Boolean).join(' · ') || '—'}</td>
                   <td className="px-3 py-2.5 font-bold text-slate-800">{u.uploads}</td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-slate-700">{formatDate(u.joinedAt)}</td>
@@ -1162,6 +1168,22 @@ function CommunityPanel({ overview }) {
               ))}
             </tbody>
           </table>
+
+          <ul className="divide-y divide-slate-100 md:hidden" aria-label="Community members">
+            {firstLoad && Array.from({ length: 3 }, (_, i) => <li key={i} className="p-3"><SkeletonBlock className="h-16" /></li>)}
+            {!loading && rows.length === 0 && <li className="px-3 py-8 text-center text-sm text-slate-600">No members found.</li>}
+            {rows.map((u) => (
+              <li key={u.id} className="space-y-1.5 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-bold text-slate-900">{u.name}</p>
+                  <TierBadge tier={u.tier} size="sm" />
+                </div>
+                <p className="text-xs text-slate-600"><span className="font-bold">ID:</span> {u.schoolId || '—'}{u.points != null && <> · <span className="font-bold">{u.points}</span> pts</>}</p>
+                <p className="break-all text-xs text-slate-600"><a href={`mailto:${u.email}`}>{u.email}</a></p>
+                <p className="text-xs text-slate-500">{[u.department, u.yearLevel].filter(Boolean).join(' · ') || '—'} · {u.uploads} uploads · Joined {formatDate(u.joinedAt)}</p>
+              </li>
+            ))}
+          </ul>
         </div>
 
         <Pager page={page} lastPage={meta.lastPage} total={meta.total} onPage={setPage} />
@@ -1231,7 +1253,7 @@ function DashboardShell({ teacher, onSignOut, onOpenResource }) {
         </button>
       </section>
 
-      <div role="tablist" aria-label="Teacher dashboard sections" onKeyDown={onKeyDown} className="flex gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm">
+      <div role="tablist" aria-label="Teacher dashboard sections" onKeyDown={onKeyDown} className="sticky top-2 z-20 flex gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white/95 p-1.5 shadow-sm backdrop-blur">
         {TABS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}

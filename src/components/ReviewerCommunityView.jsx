@@ -34,6 +34,7 @@ import {
   Info
 } from 'lucide-react';
 import PdfPreview from './PdfPreview';
+import { isPreviewable } from '../utils/fileTypes';
 import QrShareModal from './QrShareModal';
 import QrScannerModal from './QrScannerModal';
 import { TopReviewersPanel } from './TopReviewersPanel';
@@ -46,7 +47,6 @@ import { API_URL } from '../utils/Session';
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024; // matches the backend limit (20 MB)
 const PAGE_SIZE = 12; // reviewers loaded per request
 const ALLOWED_EXTENSIONS = ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'jpg', 'jpeg', 'png', 'webp'];
-const PREVIEWABLE_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
 
 // The timeframe buttons use these ids; the API calls the last one "all".
 const LEADERBOARD_PERIODS = { month: 'month', semester: 'semester', allTime: 'all' };
@@ -453,13 +453,20 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
         headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
         body
       });
-      const data = await response.json().catch(() => ({}));
+      const raw = await response.text();
+      let data = {};
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch {
+        /* the server did not send JSON (for example an error page) */
+      }
 
       if (!response.ok) {
+        const fieldErrors = data.errors ? Object.values(data.errors).flat().join(' ') : '';
+        const htmlTitle = (raw.match(/<title>([^<]*)<\/title>/i) || [])[1] || '';
+        const plainText = !raw.trim().startsWith('<') ? raw.trim().slice(0, 200) : htmlTitle.trim().slice(0, 200);
         throw new Error(
-          data.errors
-            ? Object.values(data.errors).flat().join(' ')
-            : data.message || `Upload failed (${response.status}).`
+          fieldErrors || data.message || plainText || `Upload failed (${response.status}). The server gave no details; check the backend log (storage/logs/laravel.log).`
         );
       }
 
@@ -821,7 +828,7 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
                       <Languages className="w-4 h-4" />
                     </button>
                   )}
-                  {PREVIEWABLE_TYPES.includes(item.mimeType) && (
+                  {isPreviewable(item) && (
                     <button
                       type="button"
                       onClick={() => setPreviewResource(item)}
@@ -1277,7 +1284,7 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
                 <span className="font-bold text-slate-700 block break-all">
                   {uploadForm.file ? uploadForm.file.name : 'Click to attach document'}
                 </span>
-                <span className="text-[10px] text-slate-400">PDF, DOCX, PPTX, or image (Max 20MB)</span>
+                <span className="text-[10px] text-slate-400">PDF, DOC/DOCX, PPT/PPTX, or image (Max 20MB)</span>
               </label>
 
               {uploadError && (
@@ -1302,7 +1309,7 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
                   ) : (
                     <Zap className="w-4 h-4 fill-blue-950 text-blue-950" />
                   )}
-                  <span>{uploading ? 'Uploading...' : 'Publish &amp; Earn +50 Pts'}</span>
+                  <span>{uploading ? 'Uploading...' : 'Publish & Earn +50 Pts'}</span>
                 </button>
               </div>
             </form>
