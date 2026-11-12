@@ -14,6 +14,8 @@ Every teammate runs **two programs on their own laptop**: the Laravel backend (p
 
 If `php` is not recognized, add XAMPP's PHP folder (for example `C:\xampp\php`) to the Windows PATH, then reopen PowerShell.
 
+Laravel Herd also works. It ships its own PHP, so use the `php.ini` that `php --ini` prints (see step 3b).
+
 ## 2. Get the code (pick ONE way)
 
 **A. Clone from GitHub**
@@ -39,6 +41,26 @@ composer install
 Copy-Item .env.example .env
 php artisan key:generate
 ```
+
+## 3b. Allow file uploads (do this once, or uploads fail)
+
+On a fresh Windows PHP, uploads fail with **422 "The file failed to upload"** even for small files, because PHP has no writable temporary folder and only allows 2 MB.
+
+1. Create a folder: `mkdir C:\php-tmp`
+2. Find the active config file: `php --ini` and read **Loaded Configuration File**. If it says `(none)`, copy `php.ini-development` to `php.ini` in the PHP folder.
+3. Open that `php.ini` in Notepad (as Administrator for XAMPP) and set these lines, with no `;` at the start:
+
+```ini
+file_uploads = On
+upload_tmp_dir = "C:\php-tmp"
+upload_max_filesize = 25M
+post_max_size = 30M
+```
+
+4. Stop `php artisan serve` (Ctrl+C) and start it again.
+5. Check: `php -i | findstr /i "upload_tmp_dir upload_max_filesize post_max_size"` should show `C:\php-tmp`, `25M` and `30M`.
+
+`max_file_uploads` is a number of files (for example `20`), not a size.
 
 ## 4. Database
 
@@ -117,6 +139,8 @@ Then restart both servers. If you see "table not found", you missed `php artisan
 | Teacher login fails | Run `php artisan db:seed --class=TeacherSeeder`, and check `APP_ENV=local` in `.env` |
 | Route or class "not found" after pulling | `php artisan optimize:clear`, then restart `php artisan serve` |
 | Reviewer preview says file not found | The PDFs are missing from `storage\app\private\resources`. See step 5 |
+| Uploads fail with 422 "The file failed to upload" | PHP upload settings. See step 3b. The error `error: 6` in `storage\logs\laravel.log` means PHP has no temp folder |
+| Word or PowerPoint file will not preview | Run `npm install` in the frontend (installs `docx-preview` and `pptx-preview`). These previews use the download route, so they need a tier with downloads left |
 
 ## Git rules for the team
 

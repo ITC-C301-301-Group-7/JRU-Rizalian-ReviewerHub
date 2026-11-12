@@ -8,6 +8,7 @@ A React web app where JRU students and teachers share study reviewers. It talks 
 - **Student dashboard:** profile with a changeable picture, and tabs for Overview & Schedule, My Courses, Study Reviewers & Files, and Rules & Policies.
 - **Class schedule:** add, edit and delete classes. Saved to your account.
 - **Reviewer Community:** search and filter reviewers by college, upload your own, preview and download files, and see the contributor leaderboard.
+- **Document preview:** PDFs open in a built-in viewer with a thumbnail sidebar, page counter and zoom. Word (.docx) and PowerPoint (.pptx) files are drawn in the browser with their layout and pictures. If that fails, a text-only preview is shown.
 - **Rate, comment and save:** give a 1–5 star rating, leave comments, and bookmark reviewers. Saved reviewers are listed under **Saved**.
 - **QR codes:** share any reviewer as a QR code (save it as an image or copy the link). **Scan QR** opens a reviewer from the camera, a picture of a code, or a pasted link.
 - **Contributor tiers:** earn points by uploading reviewers and getting 5-star ratings. Your tier (Tier 1 to 10) shows as a badge on your dashboard and on the Honor Roll, and sets how many pages you can preview and how many reviewers you can download each month.
@@ -34,6 +35,8 @@ A React web app where JRU students and teachers share study reviewers. It talks 
 | `pdfjs-dist` | Reading PDF text and drawing pages for OCR |
 | `tesseract.js` | OCR for scans and photos |
 | `jszip` | Reading `.docx` and `.pptx` files |
+| `docx-preview` | Drawing `.docx` files in the preview window |
+| `pptx-preview` | Drawing `.pptx` files in the preview window |
 
 ## Getting started
 
@@ -85,7 +88,10 @@ src/
     BookmarksView            Saved reviewers
     DocumentTranslator       OCR and translation
     TierBadge                Tier 1-10 / Faculty badge
-    FeatureNav, PdfPreview, ContributorLeaderboardView, CampusFooter
+    PdfPreview               Preview window (picks the right viewer for each file)
+    PdfViewer                PDF viewer: thumbnails, page counter, zoom, tier page limit
+    OfficePreview            Draws .docx and .pptx in the browser
+    FeatureNav, ContributorLeaderboardView, CampusFooter
   utils/
     Session.js               Token storage and API address
     Authedfile.js            Authenticated file download / preview
@@ -101,6 +107,7 @@ src/
 ## Notes and limits
 
 - **Document translation:** old `.doc` and `.ppt` files can only be read when they are reviewers already in the community (the app uses the server's PDF copy). If you pick one from your own device, save it as `.docx`, `.pptx` or PDF first. Text inside pictures in Word or PowerPoint files isn't read. Export to PDF instead. Only the first 40 pages of a PDF are read, and files can be up to 20 MB.
+- **Previewing Word and PowerPoint files:** the server only previews PDFs and images (`/preview` answers `415` for other types). For `.docx` and `.pptx` the app therefore fetches the original file through the download route and draws it in the browser. This means each such preview **counts as a download** and is blocked when the user's tier has no downloads left. The tier page limit is not applied to these previews. Old `.doc` and `.ppt` files cannot be previewed, only downloaded. PowerPoint drawing is approximate: animations, some fonts and complex charts may look different.
 - **OCR:** the first scan downloads a language file, so it needs internet and can take a minute.
 - **Translation quota:** the free service has a small daily limit. See the backend README to raise it.
 - **QR scanning on a phone:** browsers only allow the camera on `https://` or `localhost`. For same-Wi-Fi testing, run `npm run dev -- --host` and set `VITE_PUBLIC_APP_URL` to your computer's address, for example `http://192.168.1.5:5173`. Otherwise the QR codes point to `localhost`. Uploading a picture of a QR code works on any address.
@@ -112,3 +119,5 @@ src/
 - **"Failed to resolve import ./components/..." for a file:** the file is missing or misspelled in `src/components/`.
 - **Requests fail or lists are empty:** check that `php artisan serve` is running and that `VITE_API_URL` is correct.
 - **"Your session has expired":** sign out and sign in again.
+- **Upload fails with 422 "The file failed to upload":** this is a PHP setting on the backend computer, not the file size. See the *Uploads fail* row in `TEAMSETUP.md`.
+- **A Word or PowerPoint file will not preview:** check that you ran `npm install` (it installs `docx-preview` and `pptx-preview`), and that your tier still has downloads left. Open the browser console (F12) for the exact error.
