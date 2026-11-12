@@ -13,7 +13,7 @@ const STYLES = {
 
 const styleFor = (key) => {
   if (key === 'faculty') return STYLES.faculty;
-  const number = tierNumber(key) ?? 1;
+  const number = tierNumber(key) ?? 0;
   if (number >= 10) return STYLES.top;
   if (number >= 7) return STYLES.high;
   if (number >= 4) return STYLES.mid;

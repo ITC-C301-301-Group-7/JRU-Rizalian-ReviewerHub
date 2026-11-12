@@ -30,7 +30,8 @@ import {
   LoaderCircle,
   Bookmark,
   Languages,
-  MessageSquare
+  MessageSquare,
+  Info
 } from 'lucide-react';
 import PdfPreview from './PdfPreview';
 import QrShareModal from './QrShareModal';
@@ -119,6 +120,14 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
   // Upload Modal State
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [uploadSuccessMessage, setUploadSuccessMessage] = useState('');
+  // In-app message (replaces the browser pop-up): download limits, failed actions, etc.
+  const [notice, setNotice] = useState('');
+
+  useEffect(() => {
+    if (!notice) return undefined;
+    const timer = setTimeout(() => setNotice(''), 8000);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
   // Upload Form State
   const [uploadForm, setUploadForm] = useState({
@@ -291,7 +300,7 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
   // Voice Search Handler
   const toggleVoiceSearch = () => {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-      alert('Voice search is not supported in your browser.');
+      setNotice('Voice search is not supported in your browser.');
       return;
     }
 
@@ -338,7 +347,7 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
       );
       setReviewersList(prev => prev.map(r => (r.id === item.id ? { ...r, ...data } : r)));
     } catch (err) {
-      alert(err.message || 'Could not save your rating.');
+      setNotice(err.message || 'Could not save your rating.');
     }
   };
 
@@ -351,7 +360,7 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
       await apiRequest(`/resources/${item.id}/bookmark`, token, { method: next ? 'PUT' : 'DELETE' });
     } catch (err) {
       setReviewersList(prev => prev.map(r => (r.id === item.id ? { ...r, bookmarked: !next } : r)));
-      alert(err.message || 'Could not update your saved list.');
+      setNotice(err.message || 'Could not update your saved list.');
     }
   };
 
@@ -379,7 +388,7 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
       apply(Boolean(data.liked), data.likeCount ?? 0);
     } catch (err) {
       apply(target.isLiked, target.likes); // put it back
-      alert(err.message || 'Could not update your like.');
+      setNotice(err.message || 'Could not update your like.');
     }
   };
 
@@ -474,7 +483,7 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
     try {
       saveBlob(await fetchBlob(item.downloadUrl, token), item.filename || 'reviewer');
     } catch (err) {
-      alert(err.message || 'Download failed.');
+      setNotice(err.message || 'Download failed.');
     } finally {
       setBusyId(null);
     }
@@ -499,7 +508,7 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
       setReviewersList(prev => prev.filter(r => r.id !== item.id));
       setPagination(p => ({ ...p, total: Math.max(0, p.total - 1) }));
     } catch (err) {
-      alert(err.message || 'Delete failed.');
+      setNotice(err.message || 'Delete failed.');
     } finally {
       setBusyId(null);
     }
@@ -512,6 +521,20 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
   return (
     <div className="w-full space-y-6 text-slate-800">
       
+      {/* In-app message (fixed to the top of the screen so it is seen wherever you scrolled) */}
+      {notice && (
+        <div
+          role="alert"
+          className="fixed inset-x-0 top-4 z-[60] mx-auto flex w-[calc(100%-2rem)] max-w-md items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900 shadow-xl"
+        >
+          <Info className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+          <p className="flex-1 text-xs font-semibold">{notice}</p>
+          <button type="button" onClick={() => setNotice('')} aria-label="Close message" className="hover:opacity-75">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       {/* Toast Notification */}
       {uploadSuccessMessage && (
         <div className="bg-emerald-600 text-white p-4 rounded-xl shadow-lg flex items-center justify-between transition-all animate-bounce">

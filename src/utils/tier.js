@@ -1,4 +1,4 @@
-// Helpers for the contributor tier badge (Tier 1 - Tier 10, or "faculty").
+// Helpers for the contributor tier badge (Tier 0 - Tier 10, or "faculty").
 // The backend sends tier keys such as "tier3"; see config/reviewerhub.php -> tiers.
 
 export const tierNumber = (key) => {
@@ -9,7 +9,7 @@ export const tierNumber = (key) => {
 export const tierLabel = (key) => {
   if (key === 'faculty') return 'Faculty';
   const number = tierNumber(key);
-  return number ? `Tier ${number}` : 'Tier 1';
+  return number === null ? 'Tier 0' : `Tier ${number}`;
 };
 
 // "3-page preview" / "Full preview"
