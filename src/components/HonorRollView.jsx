@@ -4,6 +4,7 @@ import {
   UploadCloud, UserCheck, Star, LoaderCircle,
 } from 'lucide-react';
 import { apiRequest } from '../utils/teacherApi';
+import TierBadge from './TierBadge';
 
 const PERIODS = [
   { id: 'month', label: 'This Month' },
@@ -240,7 +241,7 @@ export function HonorRollView({ user, onBack, onUpload, refreshKey }) {
                       <td className="px-4 py-3 font-black">
                         <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-black ${item.rank === 1 ? 'bg-amber-400 text-blue-950' : item.rank === 2 ? 'bg-slate-300 text-slate-900' : item.rank === 3 ? 'bg-amber-700 text-white' : 'text-slate-500'}`}>#{item.rank}</span>
                       </td>
-                      <td className="px-4 py-3 font-bold text-slate-900">{item.name}{item.userId === myId && <span className="ml-2 rounded bg-amber-400 px-1.5 py-0.5 text-[9px] font-black uppercase text-blue-950">You</span>}</td>
+                      <td className="px-4 py-3 font-bold text-slate-900">{item.name}{item.userId === myId && <span className="ml-2 rounded bg-amber-400 px-1.5 py-0.5 text-[9px] font-black uppercase text-blue-950">You</span>}{item.tier && <TierBadge tier={item.tier} size="sm" className="ml-2 align-middle" />}</td>
                       <td className="px-4 py-3"><span className="block font-semibold text-slate-800">{item.college || '—'}</span><span className="text-[10px] text-slate-500">{item.program}</span></td>
                       <td className="px-4 py-3 text-center"><span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-[10px] font-extrabold text-slate-700"><Award className="h-3 w-3 text-amber-500" />{item.badge}</span></td>
                       <td className="px-4 py-3 text-center font-bold text-slate-700">{item.contributions} Reviewer{item.contributions === 1 ? '' : 's'}</td>

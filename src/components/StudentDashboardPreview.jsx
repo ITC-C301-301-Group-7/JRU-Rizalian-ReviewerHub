@@ -4,6 +4,8 @@ import { API_URL } from '../utils/Session';
 import { apiRequest } from '../utils/teacherApi';
 import { StudyReviewersPanel } from './StudyReviewersPanel';
 import { TopReviewersPanel } from './TopReviewersPanel';
+import TierBadge from './TierBadge';
+import { downloadsLabel, previewLabel } from '../utils/tier';
 import {
   BookOpen, GraduationCap, LogOut, Trophy,
   CheckCircle, Building2, Sparkles, ShieldCheck, Lock,
@@ -37,6 +39,16 @@ export function StudentDashboardPreview({ student, onSignOut, onNavigate, onUser
     apiRequest('/leaderboard?period=all&limit=1', student.token, { signal: controller.signal })
       .then((data) => setHonorPoints(data?.allTime?.points ?? 0))
       .catch((err) => { if (err.name !== 'AbortError') setHonorPoints(null); });
+    return () => controller.abort();
+  }, [student?.token, refreshKey]);
+  // Tier badge, points, allowances and progress to the next tier (GET /api/tier).
+  const [tier, setTier] = useState(null); // null while loading or if it could not be loaded
+  useEffect(() => {
+    if (!student?.token) return undefined;
+    const controller = new AbortController();
+    apiRequest('/tier', student.token, { signal: controller.signal })
+      .then((data) => setTier(data))
+      .catch((err) => { if (err.name !== 'AbortError') setTier(null); });
     return () => controller.abort();
   }, [student?.token, refreshKey]);
   const courses = schedule.courses;
@@ -107,7 +119,7 @@ export function StudentDashboardPreview({ student, onSignOut, onNavigate, onUser
             </label>
           </div>
           <div>
-            <div className="flex flex-wrap items-center gap-2"><h1 className="text-xl font-black sm:text-2xl">{name}</h1><span className="rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black uppercase text-[#002147]">{role === 'teacher' ? 'Faculty Account' : 'Student Account'}</span></div>
+            <div className="flex flex-wrap items-center gap-2"><h1 className="text-xl font-black sm:text-2xl">{name}</h1><span className="rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black uppercase text-[#002147]">{role === 'teacher' ? 'Faculty Account' : 'Student Account'}</span><TierBadge tier={tier?.key} /></div>
             <p className="mt-1 text-xs text-slate-300">ID: <strong>{studentId}</strong> · {year}</p>
             <p className="mt-1 flex items-center gap-1 text-xs text-amber-300"><Building2 size={14} />{college}</p>
             <p className="mt-1 text-[10px] text-slate-300">{uploading ? 'Uploading picture…' : 'Click the camera to change your picture'}</p>
@@ -129,6 +141,15 @@ export function StudentDashboardPreview({ student, onSignOut, onNavigate, onUser
         [Trophy, 'Honor Points', honorPoints === null ? '—' : `${honorPoints} Pts`, 'bg-purple-50 text-purple-700'],
       ].map(([Icon, label, value, color]) => <div key={label} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${color}`}><Icon size={20}/></div><div><p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{label}</p><p className="text-sm font-black text-slate-900">{value}</p></div></div>)}
     </section>
+
+    {tier && tier.key !== 'faculty' && <section aria-label="Contributor tier" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2"><TierBadge tier={tier.key} /><span className="text-xs font-bold text-slate-700">{tier.points} Pts</span></div>
+        <p className="text-[11px] text-slate-500">{previewLabel(tier)} · {downloadsLabel(tier)}</p>
+      </div>
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-valuenow={tier.progress} aria-valuemin={0} aria-valuemax={100} aria-label="Progress to the next tier"><div className="h-full rounded-full bg-amber-400" style={{ width: `${tier.progress}%` }} /></div>
+      <p className="mt-2 text-[11px] text-slate-500">{tier.next ? `${tier.pointsToNext} more points to reach ${tier.next.name}. Upload a reviewer or earn 5-star ratings to level up.` : 'You have reached the highest tier.'}</p>
+    </section>}
 
     <nav className="flex gap-2 overflow-x-auto border-b border-slate-200">{tabs.map(([key, label]) => <button key={key} type="button" aria-current={tab === key ? 'page' : undefined} onClick={() => setTab(key)} className={`whitespace-nowrap border-b-2 px-4 pb-3 text-xs font-bold ${tab === key ? 'border-[#002147] text-[#002147]' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>{label}</button>)}</nav>
 

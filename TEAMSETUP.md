@@ -7,7 +7,7 @@ Every teammate runs **two programs on their own laptop**: the Laravel backend (p
 | Tool | Version | Check it with |
 |---|---|---|
 | Git | any | `git --version` |
-| PHP | 8.2 or newer (XAMPP includes it) | `php -v` |
+| PHP | 8.3 or newer (XAMPP includes it) | `php -v` |
 | Composer | 2.x | `composer -V` |
 | Node.js | 20.19 or newer (22 LTS is best) | `node -v` |
 | MySQL | XAMPP's MySQL (or use SQLite, see step 4) | |

@@ -10,6 +10,7 @@ A React web app where JRU students and teachers share study reviewers. It talks 
 - **Reviewer Community:** search and filter reviewers by college, upload your own, preview and download files, and see the contributor leaderboard.
 - **Rate, comment and save:** give a 1–5 star rating, leave comments, and bookmark reviewers. Saved reviewers are listed under **Saved**.
 - **QR codes:** share any reviewer as a QR code (save it as an image or copy the link). **Scan QR** opens a reviewer from the camera, a picture of a code, or a pasted link.
+- **Contributor tiers:** earn points by uploading reviewers and getting 5-star ratings. Your tier (Tier 1 to 10) shows as a badge on your dashboard and on the Honor Roll, and sets how many pages you can preview and how many reviewers you can download each month.
 - **Document translation:** upload a PDF, Word (.docx), PowerPoint (.pptx) or image. The app reads the text in the browser (OCR for scans and photos), lets you correct it, then translates it into your language. Copy it or save it as `.txt`.
 
 ### Teachers (faculty)
@@ -83,6 +84,7 @@ src/
     QrShareModal / QrScannerModal
     BookmarksView            Saved reviewers
     DocumentTranslator       OCR and translation
+    TierBadge                Tier 1-10 / Faculty badge
     FeatureNav, PdfPreview, ContributorLeaderboardView, CampusFooter
   utils/
     Session.js               Token storage and API address
@@ -93,6 +95,7 @@ src/
     languages.js             Language list for translation and OCR
     resourceLinks.js         Share links and QR deep links
     idValidation.js          Student and faculty ID format checks
+    tier.js                  Tier labels and allowance text
 ```
 
 ## Notes and limits
