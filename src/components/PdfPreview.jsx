@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { X, Download, FileText, LoaderCircle, Lock } from 'lucide-react';
 import { fetchBlob, saveBlob } from '../utils/Authedfile';
 import { apiRequest } from '../utils/teacherApi';
 import TierBadge from './TierBadge';
+import { extractText, extensionOf } from '../utils/documentText';
+import OfficePreview from './OfficePreview';
 
 // Draws only the first `maxPages` pages of a PDF (what the user's tier allows).
 // Note: this limit is applied in the browser. See README "Tiers" for the hard-limit option.
@@ -98,6 +100,10 @@ export default function PdfPreview({ resource, token, onClose }) {
   const [blobUrl, setBlobUrl] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  // Text-only preview of a .docx/.pptx, used when the server cannot convert it to PDF.
+  const [textPreview, setTextPreview] = useState(null);
+  // The original .docx/.pptx, drawn in the browser when the server cannot convert it to PDF.
+  const [officeBlob, setOfficeBlob] = useState(null);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState('');
 
@@ -158,6 +164,8 @@ export default function PdfPreview({ resource, token, onClose }) {
     setError('');
     setBlobUrl(null);
     setBlob(null);
+    setTextPreview(null);
+    setOfficeBlob(null);
 
     fetchBlob(previewUrl, token, controller.signal)
       .then((fetched) => {
@@ -165,10 +173,25 @@ export default function PdfPreview({ resource, token, onClose }) {
         setBlob(fetched);
         setBlobUrl(createdUrl);
       })
-      .catch((err) => {
-        if (err.name !== 'AbortError') {
-          setError(err.message || 'Unable to load the preview.');
+      .catch(async (err) => {
+        if (err.name === 'AbortError') return;
+
+        // No PDF from the server (for example LibreOffice is not installed). For .docx and .pptx,
+        // read the original file in the browser and show its text instead.
+        const ext = extensionOf(resource?.filename || '');
+        if (downloadUrl && (ext === 'docx' || ext === 'pptx')) {
+          try {
+            const original = await fetchBlob(downloadUrl, token, controller.signal);
+            if (!controller.signal.aborted) setOfficeBlob(original);
+            return;
+          } catch (fallbackErr) {
+            if (fallbackErr.name === 'AbortError') return;
+            setError(fallbackErr.message || err.message || 'Unable to load the preview.');
+            return;
+          }
         }
+
+        setError(err.message || 'Unable to load the preview.');
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
@@ -197,6 +220,18 @@ export default function PdfPreview({ resource, token, onClose }) {
       setDownloading(false);
     }
   };
+
+  // If the browser cannot draw the Office file, fall back to its plain text.
+  const handleOfficeFailed = useCallback(async () => {
+    const original = officeBlob;
+    setOfficeBlob(null);
+    try {
+      const result = await extractText(new File([original], resource?.filename || 'file'));
+      setTextPreview(result.text);
+    } catch (err) {
+      setError(err.message || 'Unable to load the preview.');
+    }
+  }, [officeBlob, resource?.filename]);
 
   if (!resource) return null;
 
@@ -270,6 +305,17 @@ export default function PdfPreview({ resource, token, onClose }) {
           {loading || !accessReady ? (
             <div className="flex h-full items-center justify-center">
               <LoaderCircle className="h-8 w-8 animate-spin text-slate-500" />
+            </div>
+          ) : officeBlob ? (
+            <OfficePreview blob={officeBlob} filename={resource.filename} onError={handleOfficeFailed} />
+          ) : textPreview !== null ? (
+            <div className="h-full overflow-auto bg-white p-4 sm:p-8">
+              <p className="mb-4 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
+                Text-only preview. Pictures and layout are not shown. Download the file to see it exactly as written.
+              </p>
+              <pre className="mx-auto max-w-3xl whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-slate-800">
+                {textPreview}
+              </pre>
             </div>
           ) : blobUrl ? (
             showLimitedPdf ? (
