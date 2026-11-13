@@ -5,7 +5,7 @@ import { apiRequest } from '../utils/teacherApi';
 import { StudyReviewersPanel } from './StudyReviewersPanel';
 import { TopReviewersPanel } from './TopReviewersPanel';
 import TierBadge from './TierBadge';
-import { downloadsLabel, previewLabel, tierLabel } from '../utils/tier';
+import { downloadsLabel, previewLabel } from '../utils/tier';
 import {
   BookOpen, GraduationCap, LogOut, Trophy,
   CheckCircle, Building2, Sparkles, ShieldCheck, Lock,
@@ -31,6 +31,17 @@ export function StudentDashboardPreview({ student, onSignOut, onNavigate, onUser
   useEffect(() => { setTab('overview'); }, [homeSignal]);
   const schedule = useSchedule(student?.token); // saved class schedule (add / edit / delete)
 
+  // Daily check-in: the first visit each day earns points. Points are loaded again once it has been counted.
+  const [checkinTick, setCheckinTick] = useState(0);
+  useEffect(() => {
+    if (!student?.token) return undefined;
+    let cancelled = false;
+    apiRequest('/checkin', student.token, { method: 'POST' })
+      .then(() => { if (!cancelled) setCheckinTick((n) => n + 1); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [student?.token]);
+
   // Honor Points = the student's real all-time contribution points from the leaderboard API.
   const [honorPoints, setHonorPoints] = useState(null); // null while loading or if it could not be loaded
   useEffect(() => {
@@ -40,7 +51,7 @@ export function StudentDashboardPreview({ student, onSignOut, onNavigate, onUser
       .then((data) => setHonorPoints(data?.allTime?.points ?? 0))
       .catch((err) => { if (err.name !== 'AbortError') setHonorPoints(null); });
     return () => controller.abort();
-  }, [student?.token, refreshKey]);
+  }, [student?.token, refreshKey, checkinTick]);
   // Tier badge, points, allowances and progress to the next tier (GET /api/tier).
   const [showTiers, setShowTiers] = useState(false); // "All tiers" table open or closed
   const [tier, setTier] = useState(null); // null while loading or if it could not be loaded
@@ -51,7 +62,7 @@ export function StudentDashboardPreview({ student, onSignOut, onNavigate, onUser
       .then((data) => setTier(data))
       .catch((err) => { if (err.name !== 'AbortError') setTier(null); });
     return () => controller.abort();
-  }, [student?.token, refreshKey]);
+  }, [student?.token, refreshKey, checkinTick]);
   const courses = schedule.courses;
   const [uploading, setUploading] = useState(false);
   const [photoError, setPhotoError] = useState('');
@@ -149,20 +160,15 @@ export function StudentDashboardPreview({ student, onSignOut, onNavigate, onUser
         <p className="text-[11px] text-slate-500">{previewLabel(tier)} · {downloadsLabel(tier)}</p>
       </div>
       {(() => {
-        // Blue range from the start of this tier to the start of the next one, with a marker at the student's points.
-        const currentRow = Array.isArray(tier.tiers) ? tier.tiers.find((row) => row.key === tier.key) : null;
-        const rangeStart = currentRow?.minPoints ?? 0;
+        // Label on the left, "points / points needed for the next tier" on the right, thin blue bar underneath.
         const rangeEnd = tier.next?.minPoints ?? null;
-        const percent = Math.max(0, Math.min(100, tier.progress));
+        const percent = rangeEnd ? Math.max(0, Math.min(100, Math.round((tier.points / rangeEnd) * 100))) : 100;
         return <div className="mt-4">
-          <div className="relative pt-7">
-            <div className="absolute top-0 -translate-x-1/2 text-center" style={{ left: `clamp(28px, ${percent}%, calc(100% - 28px))` }}>
-              <span className="block whitespace-nowrap rounded-md bg-blue-700 px-2 py-0.5 text-[10px] font-black text-white">{tier.points} pts</span>
-              <span className="mx-auto block h-0 w-0 border-x-4 border-t-4 border-x-transparent border-t-blue-700" />
-            </div>
-            <div className="h-3 overflow-hidden rounded-full bg-blue-100" role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100} aria-label={`${tier.points} points, ${percent}% of the way to the next tier`}><div className="h-full rounded-full bg-blue-600" style={{ width: `${percent}%` }} /></div>
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-sm font-bold text-slate-800">Contributor Points</span>
+            <span className="text-sm font-bold tabular-nums text-slate-800">{tier.points} / {rangeEnd !== null ? rangeEnd : 'Max'}</span>
           </div>
-          <div className="mt-1 flex justify-between gap-2 text-[10px] font-bold text-slate-500"><span>{tierLabel(tier.key)} · {rangeStart} pts</span><span>{rangeEnd !== null ? `${tier.next.name} · ${rangeEnd} pts` : 'Top tier reached'}</span></div>
+          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100} aria-label={`${tier.points} points, ${percent}% of the way to the next tier`}><div className="h-full rounded-full bg-[#0a9dff]" style={{ width: `${percent}%` }} /></div>
         </div>;
       })()}
       <p className="mt-2 text-[11px] text-slate-500">{tier.next ? `${tier.pointsToNext} more points to reach ${tier.next.name}. Upload a reviewer or earn 5-star ratings to level up.` : 'You have reached the highest tier.'}</p>

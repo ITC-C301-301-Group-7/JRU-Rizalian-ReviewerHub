@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  X, Star, Bookmark, QrCode, Eye, Download, Languages, MessageSquare, Trash2, LoaderCircle, Send, Gamepad2,
+  X, Star, Bookmark, QrCode, Eye, Download, Languages, MessageSquare, Trash2, LoaderCircle, Send, Gamepad2, Flag,
 } from 'lucide-react';
 import PdfPreview from './PdfPreview';
 import QrShareModal from './QrShareModal';
@@ -21,6 +21,10 @@ export default function ResourceDetailModal({ resourceId, token, currentUser, on
   const [busy, setBusy] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [showQr, setShowQr] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [reportReason, setReportReason] = useState('inaccurate');
+  const [reportDetails, setReportDetails] = useState('');
+  const [reportMessage, setReportMessage] = useState('');
 
   const isOwner = resource && currentUser?.id === resource.userId;
 
@@ -74,6 +78,25 @@ export default function ResourceDetailModal({ resourceId, token, currentUser, on
       setBusy(false);
     }
   };
+
+  // Flag a fake, inaccurate, spam or inappropriate reviewer. Earns points (up to 3 reports a day).
+  const submitReport = () =>
+    run(async () => {
+      const data = await apiRequest(`/resources/${resource.id}/report`, token, {
+        method: 'POST',
+        body: { reason: reportReason, details: reportDetails.trim() || undefined },
+      });
+      setShowReport(false);
+      setReportDetails('');
+      setReportMessage(
+        data.alreadyReported
+          ? 'You already reported this reviewer.'
+          : data.pointsAwarded > 0
+            ? `Thanks for the report. You earned +${data.pointsAwarded} points.`
+            : 'Thanks for the report. You have reached the daily limit for report points.'
+      );
+      onChanged?.();
+    });
 
   const toggleBookmark = () =>
     run(async () => {
@@ -210,7 +233,30 @@ export default function ResourceDetailModal({ resourceId, token, currentUser, on
                     <Gamepad2 className="h-4 w-4" /> Play Quiz
                   </button>
                 )}
+                {!isOwner && currentUser?.role !== 'teacher' && (
+                  <button type="button" onClick={() => { setShowReport((open) => !open); setReportMessage(''); }} className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 font-bold text-red-700 hover:bg-red-50">
+                    <Flag className="h-4 w-4" /> Report
+                  </button>
+                )}
               </div>
+
+              {showReport && (
+                <div className="space-y-2 rounded-lg border border-red-200 bg-red-50 p-3">
+                  <p className="font-bold text-red-800">Report this reviewer</p>
+                  <select value={reportReason} onChange={(e) => setReportReason(e.target.value)} aria-label="Reason for the report" className="w-full rounded-lg border border-red-200 bg-white p-2">
+                    <option value="inaccurate">Fake or inaccurate</option>
+                    <option value="spam">Spam</option>
+                    <option value="inappropriate">Inappropriate</option>
+                    <option value="other">Other</option>
+                  </select>
+                  <textarea value={reportDetails} onChange={(e) => setReportDetails(e.target.value)} maxLength={500} rows={2} aria-label="More details (optional)" placeholder="Tell us more (optional)" className="w-full rounded-lg border border-red-200 bg-white p-2" />
+                  <div className="flex gap-2">
+                    <button type="button" onClick={submitReport} disabled={busy} className="cursor-pointer rounded-lg bg-red-600 px-3 py-2 font-bold text-white disabled:opacity-60">Send report</button>
+                    <button type="button" onClick={() => setShowReport(false)} className="cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-2 font-bold text-slate-700">Cancel</button>
+                  </div>
+                </div>
+              )}
+              {reportMessage && <p role="status" className="rounded-lg border border-green-200 bg-green-50 p-2.5 text-green-800">{reportMessage}</p>}
 
               {actionError && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-2.5 text-red-700">{actionError}</p>}
 

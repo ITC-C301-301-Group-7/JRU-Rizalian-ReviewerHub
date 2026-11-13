@@ -292,9 +292,9 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
   const pointEarningRules = [
     { action: 'Upload Study Material / Reviewer', points: '+50 Pts', description: 'Share course notes, reviewers, or practice sets verified by peer votes.' },
     { action: 'Receive a 5-Star Usefulness Rating', points: '+10 Pts', description: 'Earn bonus points whenever a fellow student rates your material 5 stars.' },
-    { action: 'Material Downloaded 50+ Times', points: '+25 Pts', description: 'Milestone bonus when your material becomes widely used by students.' },
-    { action: 'Report Inappropriate / Fake Material', points: '+5 Pts', description: 'Help maintain community quality by flagging inaccurate or spam content.' },
-    { action: 'Daily Academic Check-in', points: '+2 Pts', description: 'Log into the learning hub daily to maintain your active streak.' }
+    { action: 'Material Downloaded 50+ Times', points: '+25 Pts', description: 'Milestone bonus when 50 different students have downloaded your material.' },
+    { action: 'Report Inappropriate / Fake Material', points: '+5 Pts', description: 'Help maintain community quality by reporting inaccurate or spam content (up to 3 reports a day earn points).' },
+    { action: 'Daily Academic Check-in', points: '+2 Pts', description: 'Open your dashboard once a day to maintain your active streak.' }
   ];
 
   // Voice Search Handler
@@ -462,6 +462,7 @@ export function ReviewerCommunityView({ currentUser, onBackToDashboard, onOpenRe
       }
 
       if (!response.ok) {
+        console.error('Upload failed', response.status, { sentFileSize: uploadForm.file.size, sentFileType: uploadForm.file.type, rawResponse: raw });
         const fieldErrors = data.errors ? Object.values(data.errors).flat().join(' ') : '';
         const htmlTitle = (raw.match(/<title>([^<]*)<\/title>/i) || [])[1] || '';
         const plainText = !raw.trim().startsWith('<') ? raw.trim().slice(0, 200) : htmlTitle.trim().slice(0, 200);
