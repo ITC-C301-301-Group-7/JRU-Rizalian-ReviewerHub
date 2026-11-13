@@ -1,3 +1,21 @@
+import { API_URL } from './Session';
+
+// The API builds file links from the Host header it receives, so behind a proxy or a
+// public tunnel they can come back as http://... or with the wrong address, and the
+// browser blocks them ("Failed to fetch"). Keep only the path and send the request
+// through API_URL (empty = same address as the page, so the Vite proxy handles it).
+function toApiUrl(url) {
+  try {
+    const parsed = new URL(url, window.location.origin);
+    if (parsed.pathname.startsWith('/api/') || parsed.pathname.startsWith('/storage/')) {
+      return `${API_URL}${parsed.pathname}${parsed.search}`;
+    }
+  } catch {
+    /* not a valid URL, use it as it is */
+  }
+  return url;
+}
+
 // Fetches a protected file with the user's Bearer token and returns it as a Blob.
 // Needed because <iframe src> and <a href> cannot send an Authorization header.
 export async function fetchBlob(url, token, signal) {
@@ -5,7 +23,7 @@ export async function fetchBlob(url, token, signal) {
     throw new Error('Please sign in to view or download this file.');
   }
 
-  const response = await fetch(url, {
+  const response = await fetch(toApiUrl(url), {
     headers: { Authorization: `Bearer ${token}` },
     signal,
   });
