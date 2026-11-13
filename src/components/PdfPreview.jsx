@@ -205,7 +205,12 @@ export default function PdfPreview({ resource, token, onClose }) {
 
   const canDownload = access ? access.canDownload : true;
   const previewLimit = access?.previewPages ?? null;
-  const showLimitedPdf = previewLimit !== null && blob?.type === 'application/pdf';
+  // Phone browsers (Android Chrome, iPhone) cannot show a PDF inside an <iframe>; they only
+  // show an "Open" button. So on phones we draw the pages ourselves, up to PHONE_MAX_PAGES.
+  const isPhone = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const PHONE_MAX_PAGES = 40;
+  const pageLimit = isPhone ? Math.min(previewLimit ?? PHONE_MAX_PAGES, PHONE_MAX_PAGES) : previewLimit;
+  const showLimitedPdf = pageLimit !== null && blob?.type === 'application/pdf';
 
   const handleDownload = async () => {
     setDownloading(true);
@@ -319,7 +324,7 @@ export default function PdfPreview({ resource, token, onClose }) {
             </div>
           ) : blobUrl ? (
             showLimitedPdf ? (
-              <LimitedPdfPages blob={blob} maxPages={previewLimit} access={access} />
+              <LimitedPdfPages blob={blob} maxPages={pageLimit} access={access} />
             ) : (
               <iframe
                 src={blobUrl}
